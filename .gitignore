@@ -1,0 +1,30 @@
+# Ignore everything in GTA root
+/*
+
+# Allow Git ignore file
+!/.gitignore
+!/README.md
+!/LICENSE
+!/ASSET_LICENSE.md
+
+# Allow scripts and missions folders
+!/scripts/
+!/missions/
+
+# Allow all files inside scripts and missions
+!/scripts/**
+!/missions/**
+
+# But ignore unwanted files inside them
+/scripts/**/*.log
+/missions/**/*.log
+/scripts/**/*.tmp
+/missions/**/*.tmp
+
+# Keep audio out for now
+/scripts/**/*.mp3
+/scripts/**/*.wav
+/scripts/**/*.ogg
+/missions/**/*.mp3
+/missions/**/*.wav
+/missions/**/*.ogg
