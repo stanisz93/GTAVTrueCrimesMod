@@ -1,0 +1,28 @@
+{
+  "id": "silence_after_midnight",
+  "title": "Cisza po północy",
+  "description": "Seria precyzyjnych morderstw prowadzi do ratownika medycznego Adriana Vossa.",
+  "startLocation": {
+    "x": 120.0,
+    "y": -1300.0,
+    "z": 29.0
+  },
+  "firstObjective": "Jedź na miejsce zbrodni.",
+  "suspects": [
+    {
+      "id": "adrian_voss",
+      "name": "Adrian Voss",
+      "role": "Główny podejrzany"
+    }
+  ],
+  "objectives": [
+    {
+      "id": "go_to_scene",
+      "text": "Jedź na miejsce zbrodni."
+    },
+    {
+      "id": "talk_to_witness",
+      "text": "Porozmawiaj ze świadkiem przy dokach."
+    }
+  ]
+}
