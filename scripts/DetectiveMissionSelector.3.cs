@@ -182,6 +182,11 @@ private DetectiveMission LoadMissionFile(string filePath)
             LoadMissionsFromJson();
             GTA.UI.Screen.ShowSubtitle("Przeładowano JSON-y misji. Liczba misji: " + missions.Count, 5000);
         }
+
+        if (e.KeyCode == Keys.V)
+        {
+            ShowPlayerCoordinates();
+        }
     }
 
     private void OnTick(object sender, EventArgs e)
@@ -269,7 +274,7 @@ private DetectiveMission LoadMissionFile(string filePath)
         if (missions.Count == 0)
         {
             DrawText("Brak plików .json w scripts/DetectiveMissions/", 0.08f, 0.17f, 0.38f);
-            DrawText("F7 - zamknij | R - przeładuj", 0.08f, 0.22f, 0.32f);
+            DrawText("F7 - zamknij | R - przeladuj | V - pozycja gracza", 0.08f, 0.22f, 0.32f);
             return;
         }
 
@@ -282,7 +287,7 @@ private DetectiveMission LoadMissionFile(string filePath)
         DetectiveMission selected = missions[selectedIndex];
 
         DrawText("Opis: " + SafeText(selected.description), 0.08f, 0.42f, 0.32f);
-        DrawText("Enter - rozpocznij | Backspace/F7 - zamknij | R - przeładuj JSON", 0.08f, 0.47f, 0.30f);
+        DrawText("Enter - rozpocznij | Backspace/F7 - zamknij | R - przeladuj JSON | V - pozycja gracza", 0.08f, 0.47f, 0.30f);
     }
 
     private void DrawActiveMissionInfo()
@@ -296,6 +301,18 @@ private DetectiveMission LoadMissionFile(string filePath)
             return Game.Player.Character.Position;
 
         return new Vector3(pos.x, pos.y, pos.z);
+    }
+
+    private void ShowPlayerCoordinates()
+    {
+        Vector3 pos = Game.Player.Character.Position;
+
+        string text =
+            "Pozycja gracza: x=" + pos.X.ToString("0.00", CultureInfo.InvariantCulture) +
+            ", y=" + pos.Y.ToString("0.00", CultureInfo.InvariantCulture) +
+            ", z=" + pos.Z.ToString("0.00", CultureInfo.InvariantCulture);
+
+        GTA.UI.Screen.ShowSubtitle(text, 8000);
     }
 
     private string SafeText(string value)
