@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build code",
+      "type": "shell",
+      "command": "dotnet build",
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "deploy missions",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\tools\\deploy-missions.ps1"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "build",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "build code",
+        "deploy missions"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

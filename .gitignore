@@ -6,6 +6,13 @@
 !/README.md
 !/LICENSE
 !/ASSET_LICENSE.md
+!/GTAVTrueCrimesMod.csproj
+!/.vscode/
+!/.vscode/tasks.json
+!/tools/
+!/tools/**
+!/src/
+!/src/**
 
 # Allow scripts and missions folders
 !/scripts/
@@ -22,6 +29,7 @@
 /missions/**/*.tmp
 
 # Keep audio out for now
+/build-check/
 /scripts/**/*.mp3
 /scripts/**/*.wav
 /scripts/**/*.ogg
