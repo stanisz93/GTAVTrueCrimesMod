@@ -1,179 +1,179 @@
-﻿{
-    "id":  "silence_after_midnight",
-    "title":  "Cisza po pĂłĹ‚nocy",
-    "description":  "Seria precyzyjnych morderstw prowadzi do ratownika medycznego Adriana Vossa.",
-    "startLocation":  {
-                          "x":  31.27,
-                          "y":  -1444.0,
-                          "z":  29.48
-                      },
-    "firstObjective":  "JedĹş na miejsce zbrodni.",
-    "firstNode":  "warning_call",
-    "debugStartNode":  "",
-    "nodes":  [
-                  {
-                      "id":  "warning_call",
-                      "type":  "phone_call",
-                      "caller":  "Nieznany numer",
-                      "audio":  "morgan_warning.wav",
-                      "subtitles":  [
-                                        {
-                                            "atMs":  0,
-                                            "text":  "Cześć! Tu Morgan!",
-                                            "endMs":  1600
-                                        },
-                                        {
-                                            "atMs":  1700,
-                                            "text":  "Posłuchaj mnie!",
-                                            "endMs":  2800
-                                        },
-                                        {
-                                            "atMs":  2900,
-                                            "text":  "Nie idź alejką... Nie dziś wieczorem...",
-                                            "endMs":  5400
-                                        },
-                                        {
-                                            "atMs":  5500,
-                                            "text":  "Ktoś cię śledzi...",
-                                            "endMs":  7300
-                                        },
-                                        {
-                                            "atMs":  7400,
-                                            "text":  "W chwili, gdy opuścisz tłum, ułatwisz mu to...",
-                                            "endMs":  10400
-                                        },
-                                        {
-                                            "atMs":  10500,
-                                            "text":  "Więc proszę... Trzymaj się blisko ludzi...",
-                                            "endMs":  13200
-                                        },
-                                        {
-                                            "atMs":  13300,
-                                            "text":  "W tej chwili świadkowie to twoja jedyna broń!",
-                                            "endMs":  16800
-                                        }
-                                    ],
-                      "next":  "go_to_scene"
-                  },
-                  {
-                      "id":  "go_to_scene",
-                      "type":  "objective",
-                      "text":  "Jedź na miejsce zbrodni przy motelach w południowym Los Santos.",
-                      "target":  {
-                                     "x":  31.27,
-                                     "y":  -1444.0,
-                                     "z":  29.48
-                                 },
-                      "onEnter":  [
-                                      {
-                                          "type":  "spawn_stalker",
-                                          "id":  "main_stalker",
-                                          "_comment_distanceBehindPlayer":  "Dystans spawnu stalkera za graczem. Male wartosci sa dobre do debugowania, np. 3.0.",
-                                          "distanceBehindPlayer":  3.0,
-                                          "_comment_followDistance":  "Docelowy dystans, jaki stalker probuje trzymac za graczem podczas sledzenia.",
-                                          "followDistance":  12.0,
-                                          "_comment_runDistance":  "Jesli stalker jest dalej niz ta wartosc, zaczyna biec do punktu sledzenia.",
-                                          "runDistance":  45.0,
-                                          "_comment_walkDistance":  "Jesli stalker jest dalej niz ta wartosc, ale blizej niz runDistance, idzie do punktu sledzenia.",
-                                          "walkDistance":  14.0,
-                                          "_comment_tooCloseDistance":  "Jesli stalker jest blizej niz ta wartosc, probuje odsunac sie za gracza zamiast stac przy nim.",
-                                          "tooCloseDistance":  8.0,
-                                          "_comment_followRepathMs":  "Co ile milisekund stalker dostaje nowy task ruchu. Zbyt mala wartosc moze resetowac AI.",
-                                          "followRepathMs":  1500,
-                                          "_comment_playerLookingDistance":  "Maksymalny dystans wykrywania, ze gracz patrzy na stalkera.",
-                                          "playerLookingDistance":  45.0,
-                                          "_comment_playerLookingAngle":  "Kat widzenia gracza w stopniach. Jesli stalker jest w tym kacie, zaczyna udawac przechodnia.",
-                                          "playerLookingAngle":  45.0,
-                                          "_comment_pretendDurationMs":  "Jak dlugo stalker udaje przechodnia po wykryciu spojrzenia gracza.",
-                                          "pretendDurationMs":  5000,
-                                          "_comment_attackEnabled":  "Czy stalker moze zaatakowac gracza, gdy warunki izolacji sa spelnione.",
-                                          "attackEnabled":  true,
-                                          "_comment_attackDistance":  "Maksymalny dystans, z ktorego stalker moze rozpoczac atak, jesli gracz jest izolowany.",
-                                          "attackDistance":  25.0,
-                                          "_comment_isolationRadius":  "Promien sprawdzania swiadkow/NPC wokol gracza.",
-                                          "isolationRadius":  35.0,
-                                          "_comment_maxWitnesses":  "Maksymalna liczba zywych NPC w isolationRadius, przy ktorej gracz nadal jest uznany za izolowanego.",
-                                          "maxWitnesses":  0,
-                                          "_comment_meleeDistance":  "Dystans, w ktorym stalker zadaje dodatkowe obrazenia nozem.",
-                                          "meleeDistance":  4.0,
-                                          "_comment_attackDamage":  "Ile HP zabiera jeden tick dodatkowych obrazen stalkera.",
-                                          "attackDamage":  45,
-                                          "_comment_attackDamageIntervalMs":  "Co ile milisekund stalker zadaje dodatkowe obrazenia, gdy jest w meleeDistance.",
-                                          "attackDamageIntervalMs":  450
-                                      }
-                                  ],
-                      "completeWhen":  "playerNearTarget",
-                      "setFact":  "visited_crime_scene",
-                      "next":  "inspect_body"
-                  },
-                  {
-                      "id":  "inspect_body",
-                      "type":  "clue",
-                      "text":  "CiaĹ‚o jest uĹ‚oĹĽone z chirurgicznÄ… precyzjÄ…. Znajdujesz Ĺ›lad medycznej taĹ›my.",
-                      "setFact":  "has_medical_tape_clue",
-                      "next":  "check_security"
-                  },
-                  {
-                      "id":  "check_security",
-                      "type":  "clue",
-                      "text":  "Nagranie z kamery pokazuje biaĹ‚y van odjeĹĽdĹĽajÄ…cy w stronÄ™ dokĂłw.",
-                      "setFact":  "white_van_seen_heading_docks",
-                      "next":  "talk_to_witness"
-                  },
-                  {
-                      "id":  "talk_to_witness",
-                      "type":  "dialog",
-                      "text":  "Ĺšwiadek mĂłwi: sĹ‚yszaĹ‚em radio ratownicze i widziaĹ‚em mÄ™ĹĽczyznÄ™ w medycznej kurtce.",
-                      "target":  {
-                                     "x":  44.15,
-                                     "y":  -1432.75,
-                                     "z":  29.31
-                                 },
-                      "completeWhen":  "playerNearTarget",
-                      "setFact":  "witness_mentions_paramedic",
-                      "next":  "go_to_docks"
-                  },
-                  {
-                      "id":  "go_to_docks",
-                      "type":  "objective",
-                      "text":  "JedĹş do dokĂłw i sprawdĹş trop biaĹ‚ego vana.",
-                      "target":  {
-                                     "x":  900.0,
-                                     "y":  -3000.0,
-                                     "z":  5.0
-                                 },
-                      "completeWhen":  "playerNearTarget",
-                      "setFact":  "visited_docks",
-                      "next":  "dock_clue"
-                  },
-                  {
-                      "id":  "dock_clue",
-                      "type":  "clue",
-                      "text":  "Na ziemi leĹĽy zuĹĽyty opatrunek z inicjaĹ‚ami A.V. Trop prowadzi do Adriana Vossa.",
-                      "setFact":  "found_av_bandage",
-                      "next":  "ending"
-                  },
-                  {
-                      "id":  "ending",
-                      "type":  "ending",
-                      "text":  "Sprawa nabiera ksztaĹ‚tu: morderca zna medycynÄ™ ratunkowÄ… i dziaĹ‚a przy dokach."
-                  }
-              ],
-    "suspects":  [
-                     {
-                         "id":  "adrian_voss",
-                         "name":  "Adrian Voss",
-                         "role":  "GĹ‚Ăłwny podejrzany"
-                     }
-                 ],
-    "objectives":  [
-                       {
-                           "id":  "go_to_scene",
-                           "text":  "JedĹş na miejsce zbrodni."
-                       },
-                       {
-                           "id":  "talk_to_witness",
-                           "text":  "Porozmawiaj ze Ĺ›wiadkiem przy dokach."
-                       }
-                   ]
+{
+  "id": "silence_after_midnight",
+  "title": "Cisza po północy",
+  "description": "Seria precyzyjnych morderstw prowadzi do ratownika medycznego Adriana Vossa.",
+  "startLocation": {
+    "x": 31.27,
+    "y": -1444.0,
+    "z": 29.48
+  },
+  "firstObjective": "Jedź na miejsce zbrodni.",
+  "firstNode": "warning_call",
+  "debugStartNode": "",
+  "nodes": [
+    {
+      "id": "warning_call",
+      "type": "phone_call",
+      "caller": "Nieznany numer",
+      "audio": "morgan_warning.wav",
+      "subtitles": [
+        {
+          "atMs": 0,
+          "text": "Cześć! Tu Morgan!",
+          "endMs": 1600
+        },
+        {
+          "atMs": 1700,
+          "text": "Posłuchaj mnie!",
+          "endMs": 2800
+        },
+        {
+          "atMs": 2900,
+          "text": "Nie idź alejką... Nie dziś wieczorem...",
+          "endMs": 5400
+        },
+        {
+          "atMs": 5500,
+          "text": "Ktoś cię śledzi...",
+          "endMs": 7300
+        },
+        {
+          "atMs": 7400,
+          "text": "W chwili, gdy opuścisz tłum, ułatwisz mu to...",
+          "endMs": 10400
+        },
+        {
+          "atMs": 10500,
+          "text": "Więc proszę... Trzymaj się blisko ludzi...",
+          "endMs": 13200
+        },
+        {
+          "atMs": 13300,
+          "text": "W tej chwili świadkowie to twoja jedyna broń!",
+          "endMs": 16800
+        }
+      ],
+      "next": "go_to_scene"
+    },
+    {
+      "id": "go_to_scene",
+      "type": "objective",
+      "text": "Jedź na miejsce zbrodni przy motelach w południowym Los Santos.",
+      "target": {
+        "x": 31.27,
+        "y": -1444.0,
+        "z": 29.48
+      },
+      "onEnter": [
+        {
+          "type": "spawn_stalker",
+          "id": "main_stalker",
+          "_comment_distanceBehindPlayer": "Dystans spawnu stalkera za graczem. Małe wartości są dobre do debugowania, np. 3.0.",
+          "distanceBehindPlayer": 3.0,
+          "_comment_followDistance": "Docelowy dystans, jaki stalker próbuje trzymać za graczem podczas śledzenia.",
+          "followDistance": 12.0,
+          "_comment_runDistance": "Jeśli stalker jest dalej niż ta wartość, zaczyna biec do punktu śledzenia.",
+          "runDistance": 45.0,
+          "_comment_walkDistance": "Jeśli stalker jest dalej niż ta wartość, ale bliżej niż runDistance, idzie do punktu śledzenia.",
+          "walkDistance": 14.0,
+          "_comment_tooCloseDistance": "Jeśli stalker jest bliżej niż ta wartość, próbuje odsunąć się za gracza zamiast stać przy nim.",
+          "tooCloseDistance": 8.0,
+          "_comment_followRepathMs": "Co ile milisekund stalker dostaje nowy task ruchu. Zbyt mała wartość może resetować AI.",
+          "followRepathMs": 1500,
+          "_comment_playerLookingDistance": "Maksymalny dystans wykrywania, że gracz patrzy na stalkera.",
+          "playerLookingDistance": 45.0,
+          "_comment_playerLookingAngle": "Kąt widzenia gracza w stopniach. Jeśli stalker jest w tym kącie, zaczyna udawać przechodnia.",
+          "playerLookingAngle": 45.0,
+          "_comment_pretendDurationMs": "Zostawione jako fallback. Obecnie stalker udaje przechodnia tak długo, jak gracz na niego patrzy.",
+          "pretendDurationMs": 5000,
+          "_comment_attackEnabled": "Czy stalker może zaatakować gracza, gdy warunki izolacji są spełnione.",
+          "attackEnabled": true,
+          "_comment_attackDistance": "Maksymalny dystans, z którego stalker może rozpocząć atak, jeśli gracz jest izolowany.",
+          "attackDistance": 25.0,
+          "_comment_isolationRadius": "Promień sprawdzania świadków/NPC wokół gracza.",
+          "isolationRadius": 35.0,
+          "_comment_maxWitnesses": "Maksymalna liczba żywych NPC w isolationRadius, przy której gracz nadal jest uznany za izolowanego.",
+          "maxWitnesses": 0,
+          "_comment_meleeDistance": "Dystans, w którym można stosować dodatkowe sztuczne obrażenia nożem.",
+          "meleeDistance": 4.0,
+          "_comment_attackDamage": "Dodatkowe sztuczne obrażenia co tick, niezależne od animacji. 0 oznacza: używaj tylko normalnych obrażeń GTA z walki nożem.",
+          "attackDamage": 0,
+          "_comment_attackDamageIntervalMs": "Co ile milisekund stalker zadaje dodatkowe sztuczne obrażenia, jeśli attackDamage jest większe od 0.",
+          "attackDamageIntervalMs": 450
+        }
+      ],
+      "completeWhen": "playerNearTarget",
+      "setFact": "visited_crime_scene",
+      "next": "inspect_body"
+    },
+    {
+      "id": "inspect_body",
+      "type": "clue",
+      "text": "Ciało jest ułożone z chirurgiczną precyzją. Znajdujesz ślad medycznej taśmy.",
+      "setFact": "has_medical_tape_clue",
+      "next": "check_security"
+    },
+    {
+      "id": "check_security",
+      "type": "clue",
+      "text": "Nagranie z kamery pokazuje biały van odjeżdżający w stronę doków.",
+      "setFact": "white_van_seen_heading_docks",
+      "next": "talk_to_witness"
+    },
+    {
+      "id": "talk_to_witness",
+      "type": "dialog",
+      "text": "Świadek mówi: słyszałem radio ratownicze i widziałem mężczyznę w medycznej kurtce.",
+      "target": {
+        "x": 44.15,
+        "y": -1432.75,
+        "z": 29.31
+      },
+      "completeWhen": "playerNearTarget",
+      "setFact": "witness_mentions_paramedic",
+      "next": "go_to_docks"
+    },
+    {
+      "id": "go_to_docks",
+      "type": "objective",
+      "text": "Jedź do doków i sprawdź trop białego vana.",
+      "target": {
+        "x": 900.0,
+        "y": -3000.0,
+        "z": 5.0
+      },
+      "completeWhen": "playerNearTarget",
+      "setFact": "visited_docks",
+      "next": "dock_clue"
+    },
+    {
+      "id": "dock_clue",
+      "type": "clue",
+      "text": "Na ziemi leży zużyty opatrunek z inicjałami A.V. Trop prowadzi do Adriana Vossa.",
+      "setFact": "found_av_bandage",
+      "next": "ending"
+    },
+    {
+      "id": "ending",
+      "type": "ending",
+      "text": "Sprawa nabiera kształtu: morderca zna medycynę ratunkową i działa przy dokach."
+    }
+  ],
+  "suspects": [
+    {
+      "id": "adrian_voss",
+      "name": "Adrian Voss",
+      "role": "Główny podejrzany"
+    }
+  ],
+  "objectives": [
+    {
+      "id": "go_to_scene",
+      "text": "Jedź na miejsce zbrodni."
+    },
+    {
+      "id": "talk_to_witness",
+      "text": "Porozmawiaj ze świadkiem przy dokach."
+    }
+  ]
 }
