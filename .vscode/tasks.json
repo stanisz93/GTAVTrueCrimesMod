@@ -2,6 +2,19 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "validate missions",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\tools\\validate-missions.ps1"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "build code",
       "type": "shell",
       "command": "dotnet build",
@@ -24,6 +37,7 @@
       "label": "build",
       "dependsOrder": "sequence",
       "dependsOn": [
+        "validate missions",
         "build code",
         "deploy missions"
       ],
