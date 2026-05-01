@@ -26,6 +26,7 @@ namespace GTAVTrueCrimesMod.Behaviors
         private readonly int pretendDurationMs;
         private readonly int attackDamage;
         private readonly int attackDamageIntervalMs;
+        private readonly StalkerDecisionConfig decisionConfig;
         private readonly Random rng = new Random();
 
         private Ped stalker;
@@ -75,6 +76,7 @@ namespace GTAVTrueCrimesMod.Behaviors
             pretendDurationMs = config == null ? 5000 : Math.Max(500, config.GetInt("pretendDurationMs", 5000));
             attackDamage = config == null ? 0 : Math.Max(0, config.GetInt("attackDamage", 0));
             attackDamageIntervalMs = config == null ? 450 : Math.Max(100, config.GetInt("attackDamageIntervalMs", 450));
+            decisionConfig = CreateDecisionConfig();
         }
 
         public string Id
@@ -105,113 +107,159 @@ namespace GTAVTrueCrimesMod.Behaviors
 
         public void Tick(MissionRuntime runtime)
         {
-            if (stalker == null || !stalker.Exists())
-            {
-                state = "spawning";
-                SpawnBehindPlayer();
-            }
+            if (!EnsureStalkerExists())
+                return;
 
-            if (stalker == null || !stalker.Exists())
+            StalkerTickContext context = CaptureTickContext();
+            StalkerDecision decision = StalkerDecisionModel.Decide(decisionConfig, context.ToDecisionInput(attacking, pretending, lastMovementState));
+
+            UpdateDebugSnapshot(context, decision);
+            ExecuteDecision(runtime, context, decision);
+        }
+
+        private bool EnsureStalkerExists()
+        {
+            if (stalker != null && stalker.Exists())
+                return true;
+
+            state = "spawning";
+            SpawnBehindPlayer();
+
+            if (stalker != null && stalker.Exists())
+                return true;
+
+            state = "missing";
+            return false;
+        }
+
+        private StalkerTickContext CaptureTickContext()
+        {
+            StalkerTickContext context = new StalkerTickContext();
+
+            context.player = Game.Player.Character;
+            context.distance = stalker.Position.DistanceTo(context.player.Position);
+            context.witnessCount = CountNearbyWitnesses(isolationRadius);
+            context.playerLooking = IsPlayerLookingAt(stalker, playerLookingDistance, playerLookingAngle);
+            context.canRepath = Game.GameTime >= nextFollowTaskAt;
+            context.playerDead = context.player.IsDead || context.player.Health <= 0;
+
+            return context;
+        }
+
+        private void UpdateDebugSnapshot(StalkerTickContext context, StalkerDecision decision)
+        {
+            lastDistance = context.distance;
+            lastWitnessCount = context.witnessCount;
+            lastPlayerIsolated = decision.isPlayerIsolated;
+            lastAttackEnabled = attackEnabled;
+            lastPlayerLooking = context.playerLooking;
+        }
+
+        private void ExecuteDecision(MissionRuntime runtime, StalkerTickContext context, StalkerDecision decision)
+        {
+            if (decision == null)
+                return;
+
+            if (decision.shouldStopPretending)
+                StopPretending();
+
+            if (decision.action == StalkerDecision.AbortAttackWitnesses)
             {
-                state = "missing";
+                state = "attacking";
+                StopAttackAndBlendIn();
                 return;
             }
 
-            if (attacking)
+            if (decision.action == StalkerDecision.FailPlayerKilled)
             {
                 state = "attacking";
+                runtime.FailMission("Zostales zabity przez stalkera.");
+                return;
+            }
 
-                if (!IsPlayerIsolated(isolationRadius, maxWitnesses))
-                {
-                    StopAttackAndBlendIn();
-                    return;
-                }
-
+            if (decision.action == StalkerDecision.ContinueAttackApproach ||
+                decision.action == StalkerDecision.ContinueAttackCombat ||
+                decision.action == StalkerDecision.ApplyAttackDamage)
+            {
+                state = "attacking";
                 TickAttackDamage(runtime);
                 return;
             }
 
-            Ped player = Game.Player.Character;
-            float distance = stalker.Position.DistanceTo(player.Position);
-            int witnessCount = CountNearbyWitnesses(isolationRadius);
-            bool playerIsolated = witnessCount <= maxWitnesses;
-
-            lastDistance = distance;
-            lastWitnessCount = witnessCount;
-            lastPlayerIsolated = playerIsolated;
-            lastAttackEnabled = attackEnabled;
-            bool playerLooking = IsPlayerLookingAt(stalker, playerLookingDistance, playerLookingAngle);
-            lastPlayerLooking = playerLooking;
-
-            if (attackEnabled && playerIsolated && distance < attackDistance)
+            if (decision.action == StalkerDecision.StartAttack)
             {
                 state = "attack_start";
                 StartAttack();
                 return;
             }
 
-            if (attackEnabled && playerIsolated)
+            if (decision.action == StalkerDecision.ApproachAttack)
             {
-                ApproachBeforeAttack(player, distance);
+                ApproachBeforeAttack(context.player, context.distance);
                 return;
             }
 
-            if (playerLooking && distance < playerLookingDistance)
+            if (decision.action == StalkerDecision.Pretend)
             {
-                if (!pretending)
-                {
-                    state = "pretend_start";
-                    StartPretending();
-                }
-
-                TickPretending();
+                TickPretendState();
                 return;
             }
 
-            if (pretending)
-            {
-                StopPretendPhoneCall();
-                pretending = false;
-                pretendMode = 0;
-                pretendUntil = 0;
-                nextPretendTaskAt = 0;
-                currentPretendDirection = Vector3.Zero;
-                currentPretendDestination = Vector3.Zero;
-            }
-
-            if (Game.GameTime < nextFollowTaskAt)
+            if (decision.action == StalkerDecision.KeepMovement)
             {
                 state = lastMovementState;
                 return;
             }
 
-            nextFollowTaskAt = Game.GameTime + followRepathMs;
-            Vector3 followPoint = player.Position - player.ForwardVector * followDistance;
+            TickFollowMovement(context, decision.action);
+        }
 
-            if (distance > runDistance)
+        private void TickPretendState()
+        {
+            if (!pretending)
             {
-                state = "running";
-                lastMovementState = state;
+                state = "pretend_start";
+                StartPretending();
+            }
+
+            TickPretending();
+        }
+
+        private void TickFollowMovement(StalkerTickContext context, string action)
+        {
+            nextFollowTaskAt = Game.GameTime + followRepathMs;
+
+            Vector3 followPoint = context.player.Position - context.player.ForwardVector * followDistance;
+
+            if (action == StalkerDecision.RunFollow)
+            {
+                SetMovementState("running");
                 stalker.Task.RunTo(followPoint);
+                return;
             }
-            else if (distance > walkDistance)
+
+            if (action == StalkerDecision.WalkFollow)
             {
-                state = "walking";
-                lastMovementState = state;
+                SetMovementState("walking");
                 stalker.Task.FollowNavMeshTo(followPoint);
+                return;
             }
-            else if (distance < tooCloseDistance)
+
+            if (action == StalkerDecision.MoveAwayTooClose)
             {
-                state = "too_close";
-                lastMovementState = state;
-                stalker.Task.FollowNavMeshTo(player.Position - player.ForwardVector * followDistance);
+                SetMovementState("too_close");
+                stalker.Task.FollowNavMeshTo(context.player.Position - context.player.ForwardVector * followDistance);
+                return;
             }
-            else
-            {
-                state = "loitering";
-                lastMovementState = state;
-                stalker.Task.WanderAround(stalker.Position, 4f);
-            }
+
+            SetMovementState("loitering");
+            stalker.Task.WanderAround(stalker.Position, 4f);
+        }
+
+        private void SetMovementState(string newState)
+        {
+            state = newState;
+            lastMovementState = newState;
         }
 
         public void Clear()
@@ -236,6 +284,22 @@ namespace GTAVTrueCrimesMod.Behaviors
             currentPretendDirection = Vector3.Zero;
             currentPretendDestination = Vector3.Zero;
             ResetPretendPhoneState();
+        }
+
+        private StalkerDecisionConfig CreateDecisionConfig()
+        {
+            return new StalkerDecisionConfig
+            {
+                attackEnabled = attackEnabled,
+                maxWitnesses = maxWitnesses,
+                attackDistance = attackDistance,
+                meleeDistance = meleeDistance,
+                playerLookingDistance = playerLookingDistance,
+                runDistance = runDistance,
+                walkDistance = walkDistance,
+                tooCloseDistance = tooCloseDistance,
+                attackDamageEnabled = attackDamage > 0
+            };
         }
 
         private void SpawnBehindPlayer()
@@ -338,11 +402,7 @@ namespace GTAVTrueCrimesMod.Behaviors
         private void ApproachBeforeAttack(Ped player, float distance)
         {
             StopPretendPhoneCall();
-            pretending = false;
-            pretendMode = 0;
-            pretendUntil = 0;
-            currentPretendDirection = Vector3.Zero;
-            currentPretendDestination = Vector3.Zero;
+            ResetPretendMovementState();
 
             if (Game.GameTime < nextFollowTaskAt)
             {
@@ -377,6 +437,22 @@ namespace GTAVTrueCrimesMod.Behaviors
             state = "attack_aborted_witnesses";
             lastMovementState = state;
             StartPretending();
+        }
+
+        private void StopPretending()
+        {
+            StopPretendPhoneCall();
+            ResetPretendMovementState();
+        }
+
+        private void ResetPretendMovementState()
+        {
+            pretending = false;
+            pretendMode = 0;
+            pretendUntil = 0;
+            nextPretendTaskAt = 0;
+            currentPretendDirection = Vector3.Zero;
+            currentPretendDestination = Vector3.Zero;
         }
 
         private void TickAttackDamage(MissionRuntime runtime)
@@ -854,6 +930,32 @@ namespace GTAVTrueCrimesMod.Behaviors
             Vector3 side = new Vector3(-currentPretendDirection.Y, currentPretendDirection.X, 0f);
 
             return stalker.Position + currentPretendDirection * distance + side * sideDrift;
+        }
+
+        private class StalkerTickContext
+        {
+            public Ped player;
+            public float distance;
+            public int witnessCount;
+            public bool playerLooking;
+            public bool canRepath;
+            public bool playerDead;
+
+            public StalkerDecisionInput ToDecisionInput(bool attacking, bool pretending, string movementState)
+            {
+                return new StalkerDecisionInput
+                {
+                    stalkerExists = true,
+                    currentlyAttacking = attacking,
+                    currentlyPretending = pretending,
+                    playerDead = playerDead,
+                    witnessCount = witnessCount,
+                    distanceToPlayer = distance,
+                    playerLookingAtStalker = playerLooking,
+                    canRepath = canRepath,
+                    lastMovementState = movementState
+                };
+            }
         }
     }
 }
