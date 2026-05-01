@@ -2,6 +2,7 @@ using GTA;
 using GTA.Math;
 using GTA.Native;
 using GTAVTrueCrimesMod.Models;
+using GTAVTrueCrimesMod.Systems;
 using System;
 
 namespace GTAVTrueCrimesMod.Behaviors
@@ -43,6 +44,7 @@ namespace GTAVTrueCrimesMod.Behaviors
         private int nextPretendPhoneSpeechAt;
         private int nextPretendPhoneMoveAt;
         private bool pretendPhoneWalking;
+        private PhonePropAnimation pretendPhoneAnimation;
         private Vector3 currentPretendDirection;
         private Vector3 currentPretendDestination;
         private int lastWitnessCount;
@@ -214,6 +216,8 @@ namespace GTAVTrueCrimesMod.Behaviors
 
         public void Clear()
         {
+            StopPretendPhoneCall();
+
             if (stalker != null && stalker.Exists())
             {
                 stalker.Delete();
@@ -528,6 +532,9 @@ namespace GTAVTrueCrimesMod.Behaviors
             if (stalker == null || !stalker.Exists())
                 return;
 
+            if (pretendPhoneAnimation != null)
+                pretendPhoneAnimation.Tick(Game.GameTime);
+
             state = pretendPhoneHolding ? "pretend_phone_call" : "pretend_phone_pickup";
             lastMovementState = state;
 
@@ -562,7 +569,7 @@ namespace GTAVTrueCrimesMod.Behaviors
 
             try
             {
-                stalker.Task.UseMobilePhone(2500);
+                EnsurePretendPhoneAnimation().BeginPickup(pretendDurationMs + 12000);
             }
             catch
             {
@@ -752,25 +759,7 @@ namespace GTAVTrueCrimesMod.Behaviors
         {
             try
             {
-                RequestPhoneAnimationDictionary();
-
-                if (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "cellphone@"))
-                    return;
-
-                Function.Call(
-                    Hash.TASK_PLAY_ANIM,
-                    stalker.Handle,
-                    "cellphone@",
-                    "cellphone_call_listen_base",
-                    8.0f,
-                    -8.0f,
-                    Math.Max(1000, durationMs),
-                    49,
-                    0.0f,
-                    false,
-                    false,
-                    false
-                );
+                EnsurePretendPhoneAnimation().StartHold(Math.Max(1000, durationMs));
             }
             catch
             {
@@ -781,21 +770,21 @@ namespace GTAVTrueCrimesMod.Behaviors
         {
             if (stalker == null || !stalker.Exists())
             {
+                if (pretendPhoneAnimation != null)
+                    pretendPhoneAnimation.Stop();
+
+                pretendPhoneAnimation = null;
                 ResetPretendPhoneState();
                 return;
             }
 
-            if (!pretendPhoneActive)
+            if (!pretendPhoneActive && pretendPhoneAnimation == null)
                 return;
 
-            try
-            {
-                Function.Call(Hash.CLEAR_PED_SECONDARY_TASK, stalker.Handle);
-            }
-            catch
-            {
-            }
+            if (pretendPhoneAnimation != null)
+                pretendPhoneAnimation.Stop();
 
+            pretendPhoneAnimation = null;
             ResetPretendPhoneState();
         }
 
@@ -809,16 +798,12 @@ namespace GTAVTrueCrimesMod.Behaviors
             pretendPhoneWalking = false;
         }
 
-        private void RequestPhoneAnimationDictionary()
+        private PhonePropAnimation EnsurePretendPhoneAnimation()
         {
-            try
-            {
-                if (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "cellphone@"))
-                    Function.Call(Hash.REQUEST_ANIM_DICT, "cellphone@");
-            }
-            catch
-            {
-            }
+            if (pretendPhoneAnimation == null)
+                pretendPhoneAnimation = new PhonePropAnimation(stalker);
+
+            return pretendPhoneAnimation;
         }
 
         private void WalkCalmlyTo(Vector3 destination)

@@ -44,18 +44,20 @@ namespace GTAVTrueCrimesMod.Tests
             AssertNotContains(beforeAnswer, PhoneCallEvent.ShowSubtitle, "ringing tick does not show dialogue subtitles");
             AssertNotContains(beforeAnswer, PhoneCallEvent.Complete, "ringing tick does not complete node");
 
-            List<PhoneCallEvent> answered = phone.Answer(20000);
+            int answerAt = 20000;
+            int contentAt = answerAt + MissionPhoneCallController.AnswerAnimationDelayMs;
+            List<PhoneCallEvent> answered = phone.Answer(answerAt);
             AssertContains(answered, PhoneCallEvent.StopRingtone, "answer stops ringtone");
             AssertContains(answered, PhoneCallEvent.ShowAnswered, "answer shows answered prompt");
             AssertContains(answered, PhoneCallEvent.BeginCallAnimation, "answer starts player phone animation");
             AssertNotContains(answered, PhoneCallEvent.PlayAudio, "answer does not start mission audio before phone is raised");
             AssertNotContains(answered, PhoneCallEvent.ShowSubtitle, "answer does not show dialogue subtitles before phone is raised");
 
-            List<PhoneCallEvent> beforePhoneRaised = phone.Tick(21799);
+            List<PhoneCallEvent> beforePhoneRaised = phone.Tick(contentAt - 1);
             AssertNotContains(beforePhoneRaised, PhoneCallEvent.PlayAudio, "audio waits for phone raise delay");
             AssertNotContains(beforePhoneRaised, PhoneCallEvent.ShowSubtitle, "subtitles wait for phone raise delay");
 
-            List<PhoneCallEvent> firstCue = phone.Tick(21800);
+            List<PhoneCallEvent> firstCue = phone.Tick(contentAt);
             AssertContains(firstCue, PhoneCallEvent.StartCallHoldAnimation, "phone switches to hold animation when audio starts");
             AssertContains(firstCue, PhoneCallEvent.PlayAudio, "audio starts when phone is raised");
             AssertSubtitle(firstCue, "Pierwsza linia.", "first subtitle appears after answer");
@@ -67,15 +69,23 @@ namespace GTAVTrueCrimesMod.Tests
             MissionPhoneCallController phone = new MissionPhoneCallController();
 
             phone.StartRinging(node, 0);
-            phone.Answer(1000);
+            int answerAt = 1000;
+            int contentAt = answerAt + MissionPhoneCallController.AnswerAnimationDelayMs;
+            int firstCueEndAt = contentAt + 1600;
+            int lastCueEndAt = contentAt + 2800;
+            int hangupEndAt = lastCueEndAt + 900;
+            phone.Answer(answerAt);
 
-            AssertNotContains(phone.Tick(4399), PhoneCallEvent.Complete, "node is not complete before first cue ends");
-            phone.Tick(4400);
-            AssertNotContains(phone.Tick(5599), PhoneCallEvent.Complete, "node is not complete before last cue ends");
+            AssertNotContains(phone.Tick(firstCueEndAt - 1), PhoneCallEvent.Complete, "node is not complete before first cue ends");
+            phone.Tick(firstCueEndAt);
+            AssertNotContains(phone.Tick(lastCueEndAt - 1), PhoneCallEvent.Complete, "node is not complete before last cue ends");
 
-            List<PhoneCallEvent> completed = phone.Tick(5600);
-            AssertContains(completed, PhoneCallEvent.EndCallAnimation, "node ends player phone animation");
-            AssertContains(completed, PhoneCallEvent.Complete, "node completes after last subtitle end");
+            List<PhoneCallEvent> ending = phone.Tick(lastCueEndAt);
+            AssertContains(ending, PhoneCallEvent.EndCallAnimation, "node ends player phone animation after last subtitle end");
+            AssertNotContains(ending, PhoneCallEvent.Complete, "node waits for phone hangup before completing");
+
+            AssertNotContains(phone.Tick(hangupEndAt - 1), PhoneCallEvent.Complete, "node is not complete before phone hangup finishes");
+            AssertContains(phone.Tick(hangupEndAt), PhoneCallEvent.Complete, "node completes after phone hangup finishes");
         }
 
         private static void TestCompleteAfterOverride()
@@ -85,10 +95,16 @@ namespace GTAVTrueCrimesMod.Tests
 
             MissionPhoneCallController phone = new MissionPhoneCallController();
             phone.StartRinging(node, 0);
-            phone.Answer(100);
+            int answerAt = 100;
+            int completeAt = answerAt + MissionPhoneCallController.AnswerAnimationDelayMs + node.completeAfterMs;
+            int hangupEndAt = completeAt + 900;
+            phone.Answer(answerAt);
 
-            AssertNotContains(phone.Tick(10899), PhoneCallEvent.Complete, "completeAfterMs override waits until configured time");
-            AssertContains(phone.Tick(10900), PhoneCallEvent.Complete, "completeAfterMs override completes at configured time");
+            AssertNotContains(phone.Tick(completeAt - 1), PhoneCallEvent.Complete, "completeAfterMs override waits until configured time");
+            List<PhoneCallEvent> ending = phone.Tick(completeAt);
+            AssertContains(ending, PhoneCallEvent.EndCallAnimation, "completeAfterMs override starts phone hangup at configured time");
+            AssertNotContains(ending, PhoneCallEvent.Complete, "completeAfterMs override waits for phone hangup before completing");
+            AssertContains(phone.Tick(hangupEndAt), PhoneCallEvent.Complete, "completeAfterMs override completes after phone hangup");
         }
 
         private static MissionNode CreatePhoneNode()

@@ -6,7 +6,7 @@ namespace GTAVTrueCrimesMod.Systems
 {
     public class MissionPhoneCallController
     {
-        public const int AnswerAnimationDelayMs = 1800;
+        public const int AnswerAnimationDelayMs = 900;
 
         private MissionNode node;
         private string caller;
@@ -19,6 +19,8 @@ namespace GTAVTrueCrimesMod.Systems
         private int contentStartAt;
         private int fallbackTextAt;
         private int completeAt;
+        private bool endingStarted;
+        private int finishAt;
         private int nextCueIndex;
 
         public bool IsRinging
@@ -83,6 +85,17 @@ namespace GTAVTrueCrimesMod.Systems
             if (!answered || node == null || completed)
                 return events;
 
+            if (endingStarted)
+            {
+                if (nowMs >= finishAt)
+                {
+                    completed = true;
+                    events.Add(new PhoneCallEvent(PhoneCallEvent.Complete));
+                }
+
+                return events;
+            }
+
             if (!contentStarted)
             {
                 if (nowMs < contentStartAt)
@@ -100,9 +113,9 @@ namespace GTAVTrueCrimesMod.Systems
 
             if (nowMs >= completeAt)
             {
-                completed = true;
-                events.Add(new PhoneCallEvent(PhoneCallEvent.EndCallAnimation));
-                events.Add(new PhoneCallEvent(PhoneCallEvent.Complete));
+                endingStarted = true;
+                finishAt = nowMs + 900;
+                events.Add(new PhoneCallEvent(PhoneCallEvent.EndCallAnimation) { durationMs = 900 });
             }
 
             return events;
@@ -116,11 +129,13 @@ namespace GTAVTrueCrimesMod.Systems
             answered = false;
             contentStarted = false;
             completed = false;
+            endingStarted = false;
             fallbackTextShown = false;
             nextPromptAt = 0;
             contentStartAt = 0;
             fallbackTextAt = 0;
             completeAt = 0;
+            finishAt = 0;
             nextCueIndex = 0;
         }
 
