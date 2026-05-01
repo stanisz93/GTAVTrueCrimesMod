@@ -60,9 +60,9 @@
       "type": "objective",
       "text": "Jedź na miejsce zbrodni przy motelach w południowym Los Santos.",
       "target": {
-        "x": 31.27,
-        "y": -1444.0,
-        "z": 29.48
+        "x": 119.94,
+        "y": -1529.30,
+        "z": 29.14
       },
       "onEnter": [
         {
