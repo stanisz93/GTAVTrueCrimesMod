@@ -399,6 +399,9 @@ namespace GTAVTrueCrimesMod
 
         private void TickPhoneSubtitleCues()
         {
+            if (phoneCallRinging || phoneAudioStartedAt <= 0)
+                return;
+
             if (pendingPhoneNode == null || !HasPhoneSubtitleCues(pendingPhoneNode))
                 return;
 
