@@ -21,6 +21,17 @@
       "problemMatcher": "$msCompile"
     },
     {
+      "label": "test logic",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        ".\\tests\\GTAVTrueCrimesMod.Tests.csproj"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
       "label": "deploy missions",
       "type": "shell",
       "command": "powershell",
@@ -38,6 +49,7 @@
       "dependsOrder": "sequence",
       "dependsOn": [
         "validate missions",
+        "test logic",
         "build code",
         "deploy missions"
       ],

@@ -5,6 +5,7 @@ using GTAVTrueCrimesMod.Behaviors;
 using GTAVTrueCrimesMod.Effects;
 using GTAVTrueCrimesMod.Models;
 using GTAVTrueCrimesMod.NodeHandlers;
+using GTAVTrueCrimesMod.Systems;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -27,17 +28,7 @@ namespace GTAVTrueCrimesMod
         private readonly List<IMissionNodeHandler> nodeHandlers = new List<IMissionNodeHandler>();
         private readonly List<IMissionEffectHandler> effectHandlers = new List<IMissionEffectHandler>();
         private readonly List<IMissionBackgroundBehavior> backgroundBehaviors = new List<IMissionBackgroundBehavior>();
-        private bool delayedCompleteActive;
-        private int delayedCompleteAt;
-        private bool phoneCallRinging;
-        private bool phoneDialogShown;
-        private int phoneDialogAt;
-        private int nextPhonePromptAt;
-        private int phoneAudioStartedAt;
-        private int nextSubtitleCueIndex;
-        private string pendingPhoneCaller;
-        private MissionNode pendingPhoneNode;
-        private string pendingPhoneText;
+        private readonly MissionPhoneCallController phoneCall = new MissionPhoneCallController();
         private bool nativeRingtonePlaying;
         private SoundPlayer activeCallPlayer;
 
@@ -78,7 +69,7 @@ namespace GTAVTrueCrimesMod
 
         public bool IsPhoneRinging
         {
-            get { return phoneCallRinging; }
+            get { return phoneCall.IsRinging; }
         }
 
         public void StartMission(DetectiveMission mission)
@@ -337,130 +328,64 @@ namespace GTAVTrueCrimesMod
 
         internal void StartIncomingMissionCall(MissionNode node)
         {
-            string caller = string.IsNullOrEmpty(node.caller) ? "Nieznany numer" : node.caller;
-            pendingPhoneCaller = caller;
-            pendingPhoneNode = node;
-            pendingPhoneText = "";
-            phoneCallRinging = true;
-            phoneDialogShown = false;
-            phoneDialogAt = 0;
-            nextPhonePromptAt = Game.GameTime + 2000;
-            delayedCompleteActive = false;
-            delayedCompleteAt = 0;
-
-            GTA.UI.Screen.ShowSubtitle("Dzwoni: " + caller + " | Enter - odbierz", 5000);
-            PlayNativeRingtone();
+            ApplyPhoneCallEvents(phoneCall.StartRinging(node, Game.GameTime));
         }
 
         public bool TryAnswerPhoneCall()
         {
-            if (!phoneCallRinging || pendingPhoneNode == null)
+            if (!phoneCall.IsRinging)
                 return false;
 
-            StopNativeRingtone();
-            phoneCallRinging = false;
-            pendingPhoneText = pendingPhoneNode.text;
-            phoneDialogShown = false;
-            phoneAudioStartedAt = Game.GameTime;
-            nextSubtitleCueIndex = 0;
-            phoneDialogAt = HasPhoneSubtitleCues(pendingPhoneNode) ? 0 : Game.GameTime + 1000;
-            delayedCompleteActive = true;
-            delayedCompleteAt = Game.GameTime + GetPhoneCallCompleteAfterMs(pendingPhoneNode);
-
-            GTA.UI.Screen.ShowSubtitle("Polaczenie odebrane.", 1200);
-
-            if (!string.IsNullOrEmpty(pendingPhoneNode.audio))
-                PlayMissionAudio(pendingPhoneNode.audio);
-
+            ApplyPhoneCallEvents(phoneCall.Answer(Game.GameTime));
             return true;
         }
 
         private void TickDelayedNodeActions()
         {
-            if (phoneCallRinging && Game.GameTime >= nextPhonePromptAt)
-            {
-                nextPhonePromptAt = Game.GameTime + 2000;
-                GTA.UI.Screen.ShowSubtitle("Dzwoni: " + pendingPhoneCaller + " | Enter - odbierz", 2500);
-            }
-
-            TickPhoneSubtitleCues();
-
-            if (phoneDialogAt > 0 && !phoneDialogShown && Game.GameTime >= phoneDialogAt)
-            {
-                phoneDialogShown = true;
-
-                if (!string.IsNullOrEmpty(pendingPhoneText))
-                    GTA.UI.Screen.ShowSubtitle(pendingPhoneText, 7000);
-            }
-
-            if (delayedCompleteActive && Game.GameTime >= delayedCompleteAt)
-                CompleteCurrentNode();
-        }
-
-        private void TickPhoneSubtitleCues()
-        {
-            if (phoneCallRinging || phoneAudioStartedAt <= 0)
-                return;
-
-            if (pendingPhoneNode == null || !HasPhoneSubtitleCues(pendingPhoneNode))
-                return;
-
-            if (nextSubtitleCueIndex >= pendingPhoneNode.subtitles.Length)
-                return;
-
-            int elapsed = Game.GameTime - phoneAudioStartedAt;
-            MissionSubtitleCue cue = pendingPhoneNode.subtitles[nextSubtitleCueIndex];
-
-            if (elapsed < cue.atMs)
-                return;
-
-            GTA.UI.Screen.ShowSubtitle(cue.text, cue.durationMs);
-            nextSubtitleCueIndex++;
+            ApplyPhoneCallEvents(phoneCall.Tick(Game.GameTime));
         }
 
         private void ResetNodeTimers()
         {
             StopNativeRingtone();
-            delayedCompleteActive = false;
-            delayedCompleteAt = 0;
-            phoneCallRinging = false;
-            phoneDialogShown = false;
-            phoneDialogAt = 0;
-            nextPhonePromptAt = 0;
-            phoneAudioStartedAt = 0;
-            nextSubtitleCueIndex = 0;
-            pendingPhoneCaller = "";
-            pendingPhoneNode = null;
-            pendingPhoneText = "";
+            phoneCall.Reset();
         }
 
-        private bool HasPhoneSubtitleCues(MissionNode node)
+        private void ApplyPhoneCallEvents(List<PhoneCallEvent> events)
         {
-            return node != null && node.subtitles != null && node.subtitles.Length > 0;
-        }
-
-        private int GetPhoneCallCompleteAfterMs(MissionNode node)
-        {
-            if (node == null)
-                return 8000;
-
-            if (node.completeAfterMs > 0)
-                return node.completeAfterMs;
-
-            if (!HasPhoneSubtitleCues(node))
-                return 8000;
-
-            int lastEnd = 0;
-
-            for (int i = 0; i < node.subtitles.Length; i++)
+            for (int i = 0; i < events.Count; i++)
             {
-                int cueEnd = node.subtitles[i].atMs + node.subtitles[i].durationMs;
+                PhoneCallEvent phoneEvent = events[i];
 
-                if (cueEnd > lastEnd)
-                    lastEnd = cueEnd;
+                if (phoneEvent.type == PhoneCallEvent.ShowPrompt ||
+                    phoneEvent.type == PhoneCallEvent.ShowAnswered ||
+                    phoneEvent.type == PhoneCallEvent.ShowSubtitle)
+                {
+                    GTA.UI.Screen.ShowSubtitle(phoneEvent.text, phoneEvent.durationMs);
+                    continue;
+                }
+
+                if (phoneEvent.type == PhoneCallEvent.PlayRingtone)
+                {
+                    PlayNativeRingtone();
+                    continue;
+                }
+
+                if (phoneEvent.type == PhoneCallEvent.StopRingtone)
+                {
+                    StopNativeRingtone();
+                    continue;
+                }
+
+                if (phoneEvent.type == PhoneCallEvent.PlayAudio)
+                {
+                    PlayMissionAudio(phoneEvent.audio);
+                    continue;
+                }
+
+                if (phoneEvent.type == PhoneCallEvent.Complete)
+                    CompleteCurrentNode();
             }
-
-            return Math.Max(lastEnd, 1000);
         }
 
         private void PlayNativeRingtone()

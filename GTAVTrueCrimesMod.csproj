@@ -3,10 +3,11 @@
     <TargetFramework>net48</TargetFramework>
     <OutputType>Library</OutputType>
     <AssemblyName>GTAVTrueCrimesMod</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="scripts\**\*.cs" />
+    <Compile Include="src\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

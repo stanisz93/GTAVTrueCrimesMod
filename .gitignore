@@ -13,6 +13,10 @@
 !/tools/**
 !/src/
 !/src/**
+!/tests/
+!/tests/**
+/tests/bin/
+/tests/obj/
 
 # Allow scripts and missions folders
 !/scripts/

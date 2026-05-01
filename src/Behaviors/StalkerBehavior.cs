@@ -37,6 +37,11 @@ namespace GTAVTrueCrimesMod.Behaviors
         private int nextDamageAt;
         private int nextFollowTaskAt;
         private string lastMovementState = "spawning";
+        private int lastWitnessCount;
+        private bool lastPlayerIsolated;
+        private bool lastPlayerLooking;
+        private bool lastAttackEnabled;
+        private float lastDistance;
 
         public StalkerBehavior(MissionEffect config)
         {
@@ -75,11 +80,16 @@ namespace GTAVTrueCrimesMod.Behaviors
 
                 if (stalker != null && stalker.Exists())
                 {
-                    float distance = stalker.Position.DistanceTo(Game.Player.Character.Position);
-                    distanceText = distance.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "m";
+                    distanceText = lastDistance.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "m";
                 }
 
-                return "stalker[" + id + "] state=" + state + " dist=" + distanceText;
+                return
+                    "stalker[" + id + "] state=" + state +
+                    " dist=" + distanceText +
+                    " witnesses=" + lastWitnessCount +
+                    " isolated=" + lastPlayerIsolated +
+                    " looking=" + lastPlayerLooking +
+                    " attack=" + lastAttackEnabled;
             }
         }
 
@@ -113,7 +123,23 @@ namespace GTAVTrueCrimesMod.Behaviors
 
             Ped player = Game.Player.Character;
             float distance = stalker.Position.DistanceTo(player.Position);
+            int witnessCount = CountNearbyWitnesses(isolationRadius);
+            bool playerIsolated = witnessCount <= maxWitnesses;
+
+            lastDistance = distance;
+            lastWitnessCount = witnessCount;
+            lastPlayerIsolated = playerIsolated;
+            lastAttackEnabled = attackEnabled;
+
+            if (attackEnabled && playerIsolated && distance < attackDistance)
+            {
+                state = "attack_start";
+                StartAttack();
+                return;
+            }
+
             bool playerLooking = IsPlayerLookingAt(stalker, playerLookingDistance, playerLookingAngle);
+            lastPlayerLooking = playerLooking;
 
             if (playerLooking && distance < playerLookingDistance)
             {
@@ -133,13 +159,6 @@ namespace GTAVTrueCrimesMod.Behaviors
                 pretendMode = 0;
                 pretendUntil = 0;
                 nextPretendTaskAt = 0;
-            }
-
-            if (attackEnabled && IsPlayerIsolated(isolationRadius, maxWitnesses) && distance < attackDistance)
-            {
-                state = "attack_start";
-                StartAttack();
-                return;
             }
 
             if (Game.GameTime < nextFollowTaskAt)
@@ -304,6 +323,7 @@ namespace GTAVTrueCrimesMod.Behaviors
             }
 
             float distance = stalker.Position.DistanceTo(player.Position);
+            lastDistance = distance;
 
             if (distance > meleeDistance)
             {
@@ -375,6 +395,16 @@ namespace GTAVTrueCrimesMod.Behaviors
 
         private bool IsPlayerIsolated(float radius, int maxWitnesses)
         {
+            int witnessCount = CountNearbyWitnesses(radius);
+
+            lastWitnessCount = witnessCount;
+            lastPlayerIsolated = witnessCount <= maxWitnesses;
+
+            return lastPlayerIsolated;
+        }
+
+        private int CountNearbyWitnesses(float radius)
+        {
             Ped player = Game.Player.Character;
             Ped[] nearby = World.GetNearbyPeds(player, radius);
             int count = 0;
@@ -384,7 +414,10 @@ namespace GTAVTrueCrimesMod.Behaviors
                 if (ped == null || !ped.Exists())
                     continue;
 
-                if (ped == player || ped == stalker)
+                if (ped.Handle == player.Handle)
+                    continue;
+
+                if (stalker != null && stalker.Exists() && ped.Handle == stalker.Handle)
                     continue;
 
                 if (ped.IsDead)
@@ -393,7 +426,7 @@ namespace GTAVTrueCrimesMod.Behaviors
                 count++;
             }
 
-            return count <= maxWitnesses;
+            return count;
         }
     }
 }

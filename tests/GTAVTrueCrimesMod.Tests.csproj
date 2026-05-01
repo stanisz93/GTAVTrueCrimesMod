@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>GTAVTrueCrimesMod.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\src\Models\MissionNode.cs" Link="Models\MissionNode.cs" />
+    <Compile Include="..\src\Models\MissionSubtitleCue.cs" Link="Models\MissionSubtitleCue.cs" />
+    <Compile Include="..\src\Models\JsonVector3.cs" Link="Models\JsonVector3.cs" />
+    <Compile Include="..\src\Models\MissionEffect.cs" Link="Models\MissionEffect.cs" />
+    <Compile Include="..\src\Systems\MissionPhoneCallController.cs" Link="Systems\MissionPhoneCallController.cs" />
+    <Compile Include="..\src\Systems\PhoneCallEvent.cs" Link="Systems\PhoneCallEvent.cs" />
+  </ItemGroup>
+</Project>
