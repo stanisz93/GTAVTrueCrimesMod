@@ -12,5 +12,6 @@
     <Compile Include="..\src\Models\MissionEffect.cs" Link="Models\MissionEffect.cs" />
     <Compile Include="..\src\Systems\MissionPhoneCallController.cs" Link="Systems\MissionPhoneCallController.cs" />
     <Compile Include="..\src\Systems\PhoneCallEvent.cs" Link="Systems\PhoneCallEvent.cs" />
+    <Compile Include="..\src\Systems\StalkerDecisionModel.cs" Link="Systems\StalkerDecisionModel.cs" />
   </ItemGroup>
 </Project>

@@ -30,6 +30,7 @@ namespace GTAVTrueCrimesMod
         private readonly List<IMissionBackgroundBehavior> backgroundBehaviors = new List<IMissionBackgroundBehavior>();
         private readonly MissionPhoneCallController phoneCall = new MissionPhoneCallController();
         private bool nativeRingtonePlaying;
+        private bool playerPhoneAnimationActive;
         private SoundPlayer activeCallPlayer;
 
         private bool missionFailed = false;
@@ -348,6 +349,7 @@ namespace GTAVTrueCrimesMod
         private void ResetNodeTimers()
         {
             StopNativeRingtone();
+            StopPlayerPhoneAnimation();
             phoneCall.Reset();
         }
 
@@ -383,8 +385,143 @@ namespace GTAVTrueCrimesMod
                     continue;
                 }
 
+                if (phoneEvent.type == PhoneCallEvent.BeginCallAnimation)
+                {
+                    StartPlayerPhoneAnimation(phoneEvent.durationMs);
+                    continue;
+                }
+
+                if (phoneEvent.type == PhoneCallEvent.StartCallHoldAnimation)
+                {
+                    StartPlayerPhoneHoldAnimation(phoneEvent.durationMs);
+                    continue;
+                }
+
+                if (phoneEvent.type == PhoneCallEvent.EndCallAnimation)
+                {
+                    FinishPlayerPhoneAnimation();
+                    continue;
+                }
+
                 if (phoneEvent.type == PhoneCallEvent.Complete)
                     CompleteCurrentNode();
+            }
+        }
+
+        private void StartPlayerPhoneAnimation(int durationMs)
+        {
+            try
+            {
+                int duration = Math.Max(1000, durationMs);
+                Game.Player.Character.Task.UseMobilePhone(duration);
+                playerPhoneAnimationActive = true;
+                RequestPhoneAnimationDictionary();
+            }
+            catch
+            {
+                playerPhoneAnimationActive = false;
+            }
+        }
+
+        private void StartPlayerPhoneHoldAnimation(int durationMs)
+        {
+            try
+            {
+                int duration = Math.Max(1000, durationMs);
+                RequestPhoneAnimationDictionary();
+
+                if (Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "cellphone@"))
+                {
+                    Function.Call(
+                        Hash.TASK_PLAY_ANIM,
+                        Game.Player.Character.Handle,
+                        "cellphone@",
+                        "cellphone_call_listen_base",
+                        8.0f,
+                        -8.0f,
+                        duration,
+                        49,
+                        0.0f,
+                        false,
+                        false,
+                        false
+                    );
+                }
+                else
+                {
+                    Game.Player.Character.Task.UseMobilePhone(duration);
+                }
+
+                playerPhoneAnimationActive = true;
+            }
+            catch
+            {
+                playerPhoneAnimationActive = false;
+            }
+        }
+
+        private void FinishPlayerPhoneAnimation()
+        {
+            if (playerPhoneAnimationActive)
+                PlayPlayerPhoneOutAnimation();
+
+            playerPhoneAnimationActive = false;
+        }
+
+        private void StopPlayerPhoneAnimation()
+        {
+            if (!playerPhoneAnimationActive)
+                return;
+
+            try
+            {
+                Function.Call(Hash.CLEAR_PED_SECONDARY_TASK, Game.Player.Character.Handle);
+            }
+            catch
+            {
+            }
+
+            playerPhoneAnimationActive = false;
+        }
+
+        private void RequestPhoneAnimationDictionary()
+        {
+            try
+            {
+                if (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "cellphone@"))
+                    Function.Call(Hash.REQUEST_ANIM_DICT, "cellphone@");
+            }
+            catch
+            {
+            }
+        }
+
+        private void PlayPlayerPhoneOutAnimation()
+        {
+            try
+            {
+                RequestPhoneAnimationDictionary();
+
+                if (Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "cellphone@"))
+                {
+                    Function.Call(
+                        Hash.TASK_PLAY_ANIM,
+                        Game.Player.Character.Handle,
+                        "cellphone@",
+                        "cellphone_text_out",
+                        8.0f,
+                        -8.0f,
+                        900,
+                        48,
+                        0.0f,
+                        false,
+                        false,
+                        false
+                    );
+                }
+            }
+            catch
+            {
             }
         }
 

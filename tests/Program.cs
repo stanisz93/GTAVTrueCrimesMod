@@ -14,14 +14,19 @@ namespace GTAVTrueCrimesMod.Tests
             TestSubtitlesWaitUntilPhoneIsAnswered();
             TestNodeCompletesAfterLastSubtitleEnds();
             TestCompleteAfterOverride();
+            TestStalkerStartsAttackBeforePretending();
+            TestStalkerAttackStopsOnlyForWitnesses();
+            TestStalkerAttackDamageFlow();
+            TestStalkerPretendsOnlyWhenAttackIsUnavailable();
+            TestStalkerFollowMovementBands();
 
             if (failures > 0)
             {
-                Console.WriteLine("FAILED: " + failures + " phone logic test(s).");
+                Console.WriteLine("FAILED: " + failures + " logic test(s).");
                 return 1;
             }
 
-            Console.WriteLine("OK: phone logic tests passed.");
+            Console.WriteLine("OK: logic tests passed.");
             return 0;
         }
 
@@ -42,9 +47,17 @@ namespace GTAVTrueCrimesMod.Tests
             List<PhoneCallEvent> answered = phone.Answer(20000);
             AssertContains(answered, PhoneCallEvent.StopRingtone, "answer stops ringtone");
             AssertContains(answered, PhoneCallEvent.ShowAnswered, "answer shows answered prompt");
-            AssertContains(answered, PhoneCallEvent.PlayAudio, "answer starts mission audio");
+            AssertContains(answered, PhoneCallEvent.BeginCallAnimation, "answer starts player phone animation");
+            AssertNotContains(answered, PhoneCallEvent.PlayAudio, "answer does not start mission audio before phone is raised");
+            AssertNotContains(answered, PhoneCallEvent.ShowSubtitle, "answer does not show dialogue subtitles before phone is raised");
 
-            List<PhoneCallEvent> firstCue = phone.Tick(20000);
+            List<PhoneCallEvent> beforePhoneRaised = phone.Tick(21799);
+            AssertNotContains(beforePhoneRaised, PhoneCallEvent.PlayAudio, "audio waits for phone raise delay");
+            AssertNotContains(beforePhoneRaised, PhoneCallEvent.ShowSubtitle, "subtitles wait for phone raise delay");
+
+            List<PhoneCallEvent> firstCue = phone.Tick(21800);
+            AssertContains(firstCue, PhoneCallEvent.StartCallHoldAnimation, "phone switches to hold animation when audio starts");
+            AssertContains(firstCue, PhoneCallEvent.PlayAudio, "audio starts when phone is raised");
             AssertSubtitle(firstCue, "Pierwsza linia.", "first subtitle appears after answer");
         }
 
@@ -56,11 +69,12 @@ namespace GTAVTrueCrimesMod.Tests
             phone.StartRinging(node, 0);
             phone.Answer(1000);
 
-            AssertNotContains(phone.Tick(2599), PhoneCallEvent.Complete, "node is not complete before first cue ends");
-            phone.Tick(2600);
-            AssertNotContains(phone.Tick(3799), PhoneCallEvent.Complete, "node is not complete before last cue ends");
+            AssertNotContains(phone.Tick(4399), PhoneCallEvent.Complete, "node is not complete before first cue ends");
+            phone.Tick(4400);
+            AssertNotContains(phone.Tick(5599), PhoneCallEvent.Complete, "node is not complete before last cue ends");
 
-            List<PhoneCallEvent> completed = phone.Tick(3800);
+            List<PhoneCallEvent> completed = phone.Tick(5600);
+            AssertContains(completed, PhoneCallEvent.EndCallAnimation, "node ends player phone animation");
             AssertContains(completed, PhoneCallEvent.Complete, "node completes after last subtitle end");
         }
 
@@ -73,8 +87,8 @@ namespace GTAVTrueCrimesMod.Tests
             phone.StartRinging(node, 0);
             phone.Answer(100);
 
-            AssertNotContains(phone.Tick(9099), PhoneCallEvent.Complete, "completeAfterMs override waits until configured time");
-            AssertContains(phone.Tick(9100), PhoneCallEvent.Complete, "completeAfterMs override completes at configured time");
+            AssertNotContains(phone.Tick(10899), PhoneCallEvent.Complete, "completeAfterMs override waits until configured time");
+            AssertContains(phone.Tick(10900), PhoneCallEvent.Complete, "completeAfterMs override completes at configured time");
         }
 
         private static MissionNode CreatePhoneNode()
@@ -90,6 +104,163 @@ namespace GTAVTrueCrimesMod.Tests
                     new MissionSubtitleCue { atMs = 0, durationMs = 1600, text = "Pierwsza linia." },
                     new MissionSubtitleCue { atMs = 1700, durationMs = 1100, text = "Druga linia." }
                 }
+            };
+        }
+
+        private static void TestStalkerStartsAttackBeforePretending()
+        {
+            StalkerDecision decision = StalkerDecisionModel.Decide(CreateStalkerConfig(), new StalkerDecisionInput
+            {
+                stalkerExists = true,
+                currentlyAttacking = false,
+                witnessCount = 0,
+                distanceToPlayer = 10f,
+                playerLookingAtStalker = true,
+                canRepath = true
+            });
+
+            AssertEqual(StalkerDecision.StartAttack, decision.action, "isolated player in attack distance triggers attack before pretend");
+        }
+
+        private static void TestStalkerAttackStopsOnlyForWitnesses()
+        {
+            StalkerDecision lookingWhileAttacking = StalkerDecisionModel.Decide(CreateStalkerConfig(), new StalkerDecisionInput
+            {
+                stalkerExists = true,
+                currentlyAttacking = true,
+                witnessCount = 0,
+                distanceToPlayer = 10f,
+                playerLookingAtStalker = true,
+                canRepath = true
+            });
+
+            AssertEqual(StalkerDecision.ContinueAttackApproach, lookingWhileAttacking.action, "looking at attacking stalker does not stop attack");
+
+            StalkerDecision witnessesArrive = StalkerDecisionModel.Decide(CreateStalkerConfig(), new StalkerDecisionInput
+            {
+                stalkerExists = true,
+                currentlyAttacking = true,
+                witnessCount = 1,
+                distanceToPlayer = 3f,
+                playerLookingAtStalker = false,
+                canRepath = true
+            });
+
+            AssertEqual(StalkerDecision.AbortAttackWitnesses, witnessesArrive.action, "witnesses stop active attack");
+        }
+
+        private static void TestStalkerAttackDamageFlow()
+        {
+            StalkerDecision approach = StalkerDecisionModel.Decide(CreateStalkerConfig(), new StalkerDecisionInput
+            {
+                stalkerExists = true,
+                currentlyAttacking = true,
+                witnessCount = 0,
+                distanceToPlayer = 8f,
+                canRepath = true
+            });
+
+            AssertEqual(StalkerDecision.ContinueAttackApproach, approach.action, "attacking stalker approaches before melee range");
+
+            StalkerDecision damage = StalkerDecisionModel.Decide(CreateStalkerConfig(), new StalkerDecisionInput
+            {
+                stalkerExists = true,
+                currentlyAttacking = true,
+                witnessCount = 0,
+                distanceToPlayer = 2f,
+                canRepath = true
+            });
+
+            AssertEqual(StalkerDecision.ApplyAttackDamage, damage.action, "attacking stalker applies damage in melee range");
+
+            StalkerDecision killed = StalkerDecisionModel.Decide(CreateStalkerConfig(), new StalkerDecisionInput
+            {
+                stalkerExists = true,
+                currentlyAttacking = true,
+                playerDead = true,
+                witnessCount = 0,
+                distanceToPlayer = 2f,
+                canRepath = true
+            });
+
+            AssertEqual(StalkerDecision.FailPlayerKilled, killed.action, "dead player fails mission during attack");
+        }
+
+        private static void TestStalkerPretendsOnlyWhenAttackIsUnavailable()
+        {
+            StalkerDecision notIsolated = StalkerDecisionModel.Decide(CreateStalkerConfig(), new StalkerDecisionInput
+            {
+                stalkerExists = true,
+                currentlyAttacking = false,
+                witnessCount = 2,
+                distanceToPlayer = 10f,
+                playerLookingAtStalker = true,
+                canRepath = true
+            });
+
+            AssertEqual(StalkerDecision.Pretend, notIsolated.action, "stalker pretends when player sees him but witnesses block attack");
+
+            StalkerDecision isolatedButTooFarForKnife = StalkerDecisionModel.Decide(CreateStalkerConfig(), new StalkerDecisionInput
+            {
+                stalkerExists = true,
+                currentlyAttacking = false,
+                witnessCount = 0,
+                distanceToPlayer = 30f,
+                playerLookingAtStalker = true,
+                canRepath = true
+            });
+
+            AssertEqual(StalkerDecision.ApproachAttack, isolatedButTooFarForKnife.action, "isolated stalker approaches attack even when player sees him outside knife distance");
+        }
+
+        private static void TestStalkerFollowMovementBands()
+        {
+            AssertEqual(StalkerDecision.RunFollow, DecideFollowAt(60f), "far stalker runs to follow point");
+            AssertEqual(StalkerDecision.WalkFollow, DecideFollowAt(20f), "mid distance stalker walks to follow point");
+            AssertEqual(StalkerDecision.MoveAwayTooClose, DecideFollowAt(4f), "too close stalker moves away");
+            AssertEqual(StalkerDecision.Loiter, DecideFollowAt(10f), "comfortable distance stalker loiters");
+
+            StalkerDecision waiting = StalkerDecisionModel.Decide(CreateStalkerConfig(), new StalkerDecisionInput
+            {
+                stalkerExists = true,
+                currentlyAttacking = false,
+                witnessCount = 2,
+                distanceToPlayer = 60f,
+                playerLookingAtStalker = false,
+                canRepath = false
+            });
+
+            AssertEqual(StalkerDecision.KeepMovement, waiting.action, "stalker keeps movement while waiting for repath");
+        }
+
+        private static string DecideFollowAt(float distance)
+        {
+            StalkerDecision decision = StalkerDecisionModel.Decide(CreateStalkerConfig(), new StalkerDecisionInput
+            {
+                stalkerExists = true,
+                currentlyAttacking = false,
+                witnessCount = 2,
+                distanceToPlayer = distance,
+                playerLookingAtStalker = false,
+                canRepath = true
+            });
+
+            return decision.action;
+        }
+
+        private static StalkerDecisionConfig CreateStalkerConfig()
+        {
+            return new StalkerDecisionConfig
+            {
+                attackEnabled = true,
+                maxWitnesses = 0,
+                attackDistance = 12f,
+                meleeDistance = 4f,
+                playerLookingDistance = 45f,
+                runDistance = 45f,
+                walkDistance = 14f,
+                tooCloseDistance = 8f,
+                attackDamageEnabled = true
             };
         }
 
@@ -118,6 +289,14 @@ namespace GTAVTrueCrimesMod.Tests
             }
 
             Fail(message + " | missing subtitle: " + text);
+        }
+
+        private static void AssertEqual(string expected, string actual, string message)
+        {
+            if (expected == actual)
+                return;
+
+            Fail(message + " | expected: " + expected + ", actual: " + actual);
         }
 
         private static bool Contains(List<PhoneCallEvent> events, string type)

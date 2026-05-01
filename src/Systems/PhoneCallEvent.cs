@@ -8,6 +8,9 @@ namespace GTAVTrueCrimesMod.Systems
         public const string PlayRingtone = "play_ringtone";
         public const string StopRingtone = "stop_ringtone";
         public const string PlayAudio = "play_audio";
+        public const string BeginCallAnimation = "begin_call_animation";
+        public const string StartCallHoldAnimation = "start_call_hold_animation";
+        public const string EndCallAnimation = "end_call_animation";
         public const string Complete = "complete";
 
         public string type;

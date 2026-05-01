@@ -6,14 +6,17 @@ namespace GTAVTrueCrimesMod.Systems
 {
     public class MissionPhoneCallController
     {
+        public const int AnswerAnimationDelayMs = 1800;
+
         private MissionNode node;
         private string caller;
         private bool ringing;
         private bool answered;
+        private bool contentStarted;
         private bool completed;
         private bool fallbackTextShown;
         private int nextPromptAt;
-        private int answeredAt;
+        private int contentStartAt;
         private int fallbackTextAt;
         private int completeAt;
         private int nextCueIndex;
@@ -47,17 +50,17 @@ namespace GTAVTrueCrimesMod.Systems
 
             ringing = false;
             answered = true;
-            answeredAt = nowMs;
+            contentStarted = false;
+            contentStartAt = nowMs + AnswerAnimationDelayMs;
             fallbackTextShown = false;
             nextCueIndex = 0;
-            fallbackTextAt = HasSubtitleCues(node) ? 0 : nowMs + 1000;
-            completeAt = nowMs + GetCompleteAfterMs(node);
+            int callDurationMs = GetCompleteAfterMs(node);
+            fallbackTextAt = HasSubtitleCues(node) ? 0 : contentStartAt + 1000;
+            completeAt = contentStartAt + callDurationMs;
 
             events.Add(new PhoneCallEvent(PhoneCallEvent.StopRingtone));
             events.Add(new PhoneCallEvent(PhoneCallEvent.ShowAnswered) { text = "Polaczenie odebrane.", durationMs = 1200 });
-
-            if (!string.IsNullOrEmpty(node.audio))
-                events.Add(new PhoneCallEvent(PhoneCallEvent.PlayAudio) { audio = node.audio });
+            events.Add(new PhoneCallEvent(PhoneCallEvent.BeginCallAnimation) { durationMs = AnswerAnimationDelayMs + callDurationMs + 1000 });
 
             return events;
         }
@@ -80,12 +83,25 @@ namespace GTAVTrueCrimesMod.Systems
             if (!answered || node == null || completed)
                 return events;
 
+            if (!contentStarted)
+            {
+                if (nowMs < contentStartAt)
+                    return events;
+
+                contentStarted = true;
+                events.Add(new PhoneCallEvent(PhoneCallEvent.StartCallHoldAnimation) { durationMs = completeAt - nowMs + 1000 });
+
+                if (!string.IsNullOrEmpty(node.audio))
+                    events.Add(new PhoneCallEvent(PhoneCallEvent.PlayAudio) { audio = node.audio });
+            }
+
             AddSubtitleCueEvents(events, nowMs);
             AddFallbackTextEvent(events, nowMs);
 
             if (nowMs >= completeAt)
             {
                 completed = true;
+                events.Add(new PhoneCallEvent(PhoneCallEvent.EndCallAnimation));
                 events.Add(new PhoneCallEvent(PhoneCallEvent.Complete));
             }
 
@@ -98,10 +114,11 @@ namespace GTAVTrueCrimesMod.Systems
             caller = "";
             ringing = false;
             answered = false;
+            contentStarted = false;
             completed = false;
             fallbackTextShown = false;
             nextPromptAt = 0;
-            answeredAt = 0;
+            contentStartAt = 0;
             fallbackTextAt = 0;
             completeAt = 0;
             nextCueIndex = 0;
@@ -115,7 +132,7 @@ namespace GTAVTrueCrimesMod.Systems
             if (nextCueIndex >= node.subtitles.Length)
                 return;
 
-            int elapsed = nowMs - answeredAt;
+            int elapsed = nowMs - contentStartAt;
             MissionSubtitleCue cue = node.subtitles[nextCueIndex];
 
             if (elapsed < cue.atMs)
