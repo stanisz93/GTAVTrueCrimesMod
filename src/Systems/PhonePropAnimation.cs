@@ -64,6 +64,7 @@ namespace GTAVTrueCrimesMod.Systems
                 EnsurePhoneProp();
                 holding = false;
                 holdUntil = 0;
+                ClearSecondaryTask();
                 finishing = true;
                 deleteAt = nowMs + outDuration;
             }
@@ -84,7 +85,6 @@ namespace GTAVTrueCrimesMod.Systems
             if (nowMs < deleteAt)
                 return;
 
-            ClearSecondaryTask();
             DeletePhoneProp();
             holding = false;
             holdUntil = 0;

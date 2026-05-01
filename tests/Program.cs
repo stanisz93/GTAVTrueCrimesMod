@@ -73,7 +73,7 @@ namespace GTAVTrueCrimesMod.Tests
             int contentAt = answerAt + MissionPhoneCallController.AnswerAnimationDelayMs;
             int firstCueEndAt = contentAt + 1600;
             int lastCueEndAt = contentAt + 2800;
-            int hangupEndAt = lastCueEndAt + 900;
+            int hangupEndAt = lastCueEndAt + MissionPhoneCallController.HangupCleanupDelayMs;
             phone.Answer(answerAt);
 
             AssertNotContains(phone.Tick(firstCueEndAt - 1), PhoneCallEvent.Complete, "node is not complete before first cue ends");
@@ -97,7 +97,7 @@ namespace GTAVTrueCrimesMod.Tests
             phone.StartRinging(node, 0);
             int answerAt = 100;
             int completeAt = answerAt + MissionPhoneCallController.AnswerAnimationDelayMs + node.completeAfterMs;
-            int hangupEndAt = completeAt + 900;
+            int hangupEndAt = completeAt + MissionPhoneCallController.HangupCleanupDelayMs;
             phone.Answer(answerAt);
 
             AssertNotContains(phone.Tick(completeAt - 1), PhoneCallEvent.Complete, "completeAfterMs override waits until configured time");
@@ -130,7 +130,7 @@ namespace GTAVTrueCrimesMod.Tests
                 stalkerExists = true,
                 currentlyAttacking = false,
                 witnessCount = 0,
-                distanceToPlayer = 10f,
+                distanceToPlayer = 4f,
                 playerLookingAtStalker = true,
                 canRepath = true
             });
@@ -270,7 +270,7 @@ namespace GTAVTrueCrimesMod.Tests
             {
                 attackEnabled = true,
                 maxWitnesses = 0,
-                attackDistance = 12f,
+                attackDistance = 5f,
                 meleeDistance = 4f,
                 playerLookingDistance = 45f,
                 runDistance = 45f,

@@ -401,7 +401,7 @@ namespace GTAVTrueCrimesMod
 
                 if (phoneEvent.type == PhoneCallEvent.EndCallAnimation)
                 {
-                    FinishPlayerPhoneAnimation();
+                    FinishPlayerPhoneAnimation(phoneEvent.durationMs);
                     continue;
                 }
 
@@ -440,10 +440,10 @@ namespace GTAVTrueCrimesMod
             }
         }
 
-        private void FinishPlayerPhoneAnimation()
+        private void FinishPlayerPhoneAnimation(int durationMs)
         {
             if (playerPhoneAnimation != null)
-                playerPhoneAnimation.Finish(Game.GameTime, 900);
+                playerPhoneAnimation.Finish(Game.GameTime, durationMs);
 
             playerPhoneAnimationActive = playerPhoneAnimation != null && playerPhoneAnimation.Active;
         }

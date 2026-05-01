@@ -7,6 +7,7 @@ namespace GTAVTrueCrimesMod.Systems
     public class MissionPhoneCallController
     {
         public const int AnswerAnimationDelayMs = 900;
+        public const int HangupCleanupDelayMs = 1800;
 
         private MissionNode node;
         private string caller;
@@ -114,8 +115,8 @@ namespace GTAVTrueCrimesMod.Systems
             if (nowMs >= completeAt)
             {
                 endingStarted = true;
-                finishAt = nowMs + 900;
-                events.Add(new PhoneCallEvent(PhoneCallEvent.EndCallAnimation) { durationMs = 900 });
+                finishAt = nowMs + HangupCleanupDelayMs;
+                events.Add(new PhoneCallEvent(PhoneCallEvent.EndCallAnimation) { durationMs = HangupCleanupDelayMs });
             }
 
             return events;

@@ -70,7 +70,7 @@ namespace GTAVTrueCrimesMod.Behaviors
             playerLookingAngle = PositiveOrDefault(config == null ? 0f : config.GetFloat("playerLookingAngle", 45f), 45f);
             isolationRadius = PositiveOrDefault(config == null ? 0f : config.GetFloat("isolationRadius", 35f), 35f);
             maxWitnesses = config == null ? 0 : Math.Max(0, config.GetInt("maxWitnesses", 0));
-            attackDistance = PositiveOrDefault(config == null ? 0f : config.GetFloat("attackDistance", 25f), 25f);
+            attackDistance = PositiveOrDefault(config == null ? 0f : config.GetFloat("attackDistance", 5f), 5f);
             meleeDistance = PositiveOrDefault(config == null ? 0f : config.GetFloat("meleeDistance", 4f), 4f);
             followRepathMs = config == null ? 1500 : Math.Max(250, config.GetInt("followRepathMs", 1500));
             pretendDurationMs = config == null ? 5000 : Math.Max(500, config.GetInt("pretendDurationMs", 5000));
@@ -234,14 +234,14 @@ namespace GTAVTrueCrimesMod.Behaviors
             if (action == StalkerDecision.RunFollow)
             {
                 SetMovementState("running");
-                stalker.Task.RunTo(followPoint);
+                MoveQuicklyWhenUnseen(followPoint, context.playerLooking);
                 return;
             }
 
             if (action == StalkerDecision.WalkFollow)
             {
                 SetMovementState("walking");
-                stalker.Task.FollowNavMeshTo(followPoint);
+                MoveQuicklyWhenUnseen(followPoint, context.playerLooking);
                 return;
             }
 
@@ -417,10 +417,7 @@ namespace GTAVTrueCrimesMod.Behaviors
 
             Vector3 approachPoint = player.Position;
 
-            if (distance > runDistance)
-                stalker.Task.RunTo(approachPoint);
-            else
-                WalkCalmlyTo(approachPoint);
+            MoveQuicklyWhenUnseen(approachPoint, lastPlayerLooking);
         }
 
         private void StopAttackAndBlendIn()
@@ -905,6 +902,43 @@ namespace GTAVTrueCrimesMod.Behaviors
             catch
             {
                 stalker.Task.FollowNavMeshTo(destination);
+            }
+        }
+
+        private void MoveQuicklyWhenUnseen(Vector3 destination, bool playerLooking)
+        {
+            if (playerLooking)
+            {
+                WalkCalmlyTo(destination);
+                return;
+            }
+
+            SprintTo(destination);
+        }
+
+        private void SprintTo(Vector3 destination)
+        {
+            if (stalker == null || !stalker.Exists())
+                return;
+
+            try
+            {
+                Function.Call(
+                    Hash.TASK_FOLLOW_NAV_MESH_TO_COORD,
+                    stalker.Handle,
+                    destination.X,
+                    destination.Y,
+                    destination.Z,
+                    3.0f,
+                    -1,
+                    1.0f,
+                    false,
+                    0.0f
+                );
+            }
+            catch
+            {
+                stalker.Task.RunTo(destination);
             }
         }
 
