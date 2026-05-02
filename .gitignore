@@ -15,6 +15,7 @@
 !/docs/
 /docs/*
 !/docs/voice-generation.md
+!/docs/stalker-behavior.md
 !/src/
 !/src/**
 !/tests/

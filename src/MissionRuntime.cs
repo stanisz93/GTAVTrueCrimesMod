@@ -29,6 +29,7 @@ namespace GTAVTrueCrimesMod
         private readonly List<IMissionEffectHandler> effectHandlers = new List<IMissionEffectHandler>();
         private readonly List<IMissionBackgroundBehavior> backgroundBehaviors = new List<IMissionBackgroundBehavior>();
         private readonly MissionPhoneCallController phoneCall = new MissionPhoneCallController();
+        private MissionEffectConfigLoader effectConfigLoader;
         private bool nativeRingtonePlaying;
         private bool playerPhoneAnimationActive;
         private PhonePropAnimation playerPhoneAnimation;
@@ -78,6 +79,7 @@ namespace GTAVTrueCrimesMod
         {
             activeMission = mission;
             retryMission = mission;
+            effectConfigLoader = CreateEffectConfigLoader(mission);
             missionFailed = false;
             missionFailureReason = "";
             facts.Clear();
@@ -315,7 +317,7 @@ namespace GTAVTrueCrimesMod
 
             for (int i = 0; i < node.onEnter.Length; i++)
             {
-                MissionEffect effect = node.onEnter[i];
+                MissionEffect effect = ResolveMissionEffect(node.onEnter[i]);
 
                 for (int h = 0; h < effectHandlers.Count; h++)
                 {
@@ -326,6 +328,22 @@ namespace GTAVTrueCrimesMod
                     }
                 }
             }
+        }
+
+        private MissionEffectConfigLoader CreateEffectConfigLoader(DetectiveMission mission)
+        {
+            if (mission == null || string.IsNullOrEmpty(mission.sourceFile))
+                return new MissionEffectConfigLoader("");
+
+            return new MissionEffectConfigLoader(Path.GetDirectoryName(mission.sourceFile));
+        }
+
+        private MissionEffect ResolveMissionEffect(MissionEffect effect)
+        {
+            if (effectConfigLoader == null)
+                return effect;
+
+            return effectConfigLoader.Resolve(effect);
         }
 
         internal void StartIncomingMissionCall(MissionNode node)

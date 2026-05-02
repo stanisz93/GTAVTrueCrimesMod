@@ -2,6 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $missionsDir = Join-Path $repoRoot "missions"
+$effectsDir = Join-Path $missionsDir "effects"
 $knownEffectTypes = @(
     "spawn_stalker"
 )
@@ -86,6 +87,126 @@ function Test-SubtitleCues {
         }
         elseif (-not (Test-SpeakableText $cue.text)) {
             Add-Error $FileName "phone_call '$NodeId' subtitle '$($cue.text)' has no speakable text"
+        }
+    }
+}
+
+function Test-NonNegativeNumber {
+    param(
+        [string]$FileName,
+        [string]$Scope,
+        [object]$Object,
+        [string]$Name
+    )
+
+    if ((Has-Property $Object $Name) -and $Object.$Name -lt 0) {
+        Add-Error $FileName "$Scope $Name cannot be negative"
+    }
+}
+
+function Test-PositiveNumber {
+    param(
+        [string]$FileName,
+        [string]$Scope,
+        [object]$Object,
+        [string]$Name
+    )
+
+    if ((Has-Property $Object $Name) -and $Object.$Name -le 0) {
+        Add-Error $FileName "$Scope $Name must be positive"
+    }
+}
+
+function Test-MinNumber {
+    param(
+        [string]$FileName,
+        [string]$Scope,
+        [object]$Object,
+        [string]$Name,
+        [double]$Minimum
+    )
+
+    if ((Has-Property $Object $Name) -and $Object.$Name -lt $Minimum) {
+        Add-Error $FileName "$Scope $Name should be >= $Minimum"
+    }
+}
+
+function Test-SpawnStalkerSettings {
+    param(
+        [string]$FileName,
+        [string]$Scope,
+        [object]$Settings
+    )
+
+    $positiveFields = @(
+        "distanceBehindPlayer",
+        "followDistance",
+        "runDistance",
+        "walkDistance",
+        "tooCloseDistance",
+        "playerLookingDistance",
+        "playerLookingAngle",
+        "pretendDurationMs",
+        "attackDistance",
+        "isolationRadius",
+        "meleeDistance",
+        "attackDamageIntervalMs"
+    )
+
+    foreach ($field in $positiveFields) {
+        Test-PositiveNumber $FileName $Scope $Settings $field
+    }
+
+    Test-MinNumber $FileName $Scope $Settings "followRepathMs" 250
+    Test-MinNumber $FileName $Scope $Settings "pretendDurationMs" 500
+    Test-MinNumber $FileName $Scope $Settings "attackDamageIntervalMs" 100
+    Test-NonNegativeNumber $FileName $Scope $Settings "maxWitnesses"
+    Test-NonNegativeNumber $FileName $Scope $Settings "attackDamage"
+}
+
+function Test-EffectConfigFile {
+    param([System.IO.FileInfo]$File)
+
+    $config = $null
+
+    try {
+        $config = Get-Content -LiteralPath $File.FullName -Raw | ConvertFrom-Json
+    }
+    catch {
+        Add-Error $File.Name "invalid effect config JSON: $($_.Exception.Message)"
+        return
+    }
+
+    if (-not (Has-Property $config "type") -or [string]::IsNullOrWhiteSpace($config.type)) {
+        Add-Error $File.Name "effect config missing type"
+        return
+    }
+
+    if ($knownEffectTypes -notcontains $config.type) {
+        Add-Error $File.Name "effect config has unknown type '$($config.type)'"
+    }
+
+    if ($File.BaseName -ne $config.type) {
+        Add-Error $File.Name "effect config filename should match type '$($config.type)'"
+    }
+
+    if (-not (Has-Property $config "default") -or $null -eq $config.default) {
+        Add-Error $File.Name "effect config missing default settings"
+    }
+    elseif ($config.type -eq "spawn_stalker") {
+        Test-SpawnStalkerSettings $File.Name "default" $config.default
+    }
+
+    if ((Has-Property $config "configs") -and $null -ne $config.configs) {
+        foreach ($entry in @($config.configs)) {
+            if (-not (Has-Property $entry "id") -or [string]::IsNullOrWhiteSpace($entry.id)) {
+                Add-Error $File.Name "effect config override missing id"
+                continue
+            }
+
+            if ($config.type -eq "spawn_stalker") {
+                Test-SpawnStalkerSettings $File.Name "override '$($entry.id)'" $entry
+            }
         }
     }
 }
@@ -232,6 +353,14 @@ foreach ($file in $files) {
                 }
             }
         }
+    }
+}
+
+if (Test-Path -LiteralPath $effectsDir) {
+    $effectConfigFiles = Get-ChildItem -LiteralPath $effectsDir -Filter "*.json" -File
+
+    foreach ($file in $effectConfigFiles) {
+        Test-EffectConfigFile $file
     }
 }
 

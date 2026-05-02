@@ -1,0 +1,44 @@
+{
+  "type": "spawn_stalker",
+  "_comment": "Default settings for spawn_stalker effects. Entries in configs override only listed keys for a specific effect id.",
+  "default": {
+    "_comment_distanceBehindPlayer": "Spawn distance behind the player. Small values are useful for debugging.",
+    "distanceBehindPlayer": 3.0,
+    "_comment_followDistance": "Target distance the stalker tries to keep behind the player while following.",
+    "followDistance": 12.0,
+    "_comment_runDistance": "If the stalker is farther than this, he runs to the follow point.",
+    "runDistance": 45.0,
+    "_comment_walkDistance": "If the stalker is farther than this, but closer than runDistance, he walks to the follow point.",
+    "walkDistance": 14.0,
+    "_comment_tooCloseDistance": "If the stalker is closer than this, he moves back instead of standing too close.",
+    "tooCloseDistance": 8.0,
+    "_comment_followRepathMs": "How often the stalker gets a new movement task. Very low values can reset AI too often.",
+    "followRepathMs": 1500,
+    "_comment_playerLookingDistance": "Maximum distance for detecting that the player camera is looking at the stalker.",
+    "playerLookingDistance": 45.0,
+    "_comment_playerLookingAngle": "Camera angle in degrees. If the stalker is inside this angle, he pretends to be a pedestrian.",
+    "playerLookingAngle": 45.0,
+    "_comment_pretendDurationMs": "Fallback duration. Currently the stalker keeps pretending as long as the player is looking.",
+    "pretendDurationMs": 5000,
+    "_comment_attackEnabled": "Whether the stalker can attack when isolation conditions are met.",
+    "attackEnabled": true,
+    "_comment_attackDistance": "Distance where the stalker draws the knife and starts combat if the player is isolated.",
+    "attackDistance": 5.0,
+    "_comment_isolationRadius": "Radius for checking witnesses/NPCs around the player.",
+    "isolationRadius": 20.0,
+    "_comment_maxWitnesses": "Maximum live NPC count in isolationRadius where the player is still considered isolated.",
+    "maxWitnesses": 0,
+    "_comment_meleeDistance": "Distance where optional extra knife damage can be applied.",
+    "meleeDistance": 4.0,
+    "_comment_attackDamage": "Extra scripted damage per tick. 0 means use only normal GTA knife combat damage.",
+    "attackDamage": 0,
+    "_comment_attackDamageIntervalMs": "How often extra scripted damage is applied when attackDamage is greater than 0.",
+    "attackDamageIntervalMs": 450
+  },
+  "configs": [
+    {
+      "id": "main_stalker",
+      "_comment": "Current mission stalker uses the default values. Add only changed keys here when this id needs overrides."
+    }
+  ]
+}

@@ -2,6 +2,7 @@ using GTAVTrueCrimesMod.Models;
 using GTAVTrueCrimesMod.Systems;
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace GTAVTrueCrimesMod.Tests
 {
@@ -14,6 +15,7 @@ namespace GTAVTrueCrimesMod.Tests
             TestSubtitlesWaitUntilPhoneIsAnswered();
             TestNodeCompletesAfterLastSubtitleEnds();
             TestCompleteAfterOverride();
+            TestMissionEffectConfigMergesDefaultsIdOverridesAndInlineArgs();
             TestStalkerStartsAttackBeforePretending();
             TestStalkerAttackStopsOnlyForWitnesses();
             TestStalkerAttackDamageFlow();
@@ -121,6 +123,38 @@ namespace GTAVTrueCrimesMod.Tests
                     new MissionSubtitleCue { atMs = 1700, durationMs = 1100, text = "Druga linia." }
                 }
             };
+        }
+
+        private static void TestMissionEffectConfigMergesDefaultsIdOverridesAndInlineArgs()
+        {
+            string root = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "effect_config_test");
+            string effectsDir = Path.Combine(root, "effects");
+
+            if (Directory.Exists(root))
+                Directory.Delete(root, true);
+
+            Directory.CreateDirectory(effectsDir);
+            File.WriteAllText(
+                Path.Combine(effectsDir, "spawn_stalker.json"),
+                "{ \"type\": \"spawn_stalker\", \"default\": { \"distanceBehindPlayer\": 40.0, \"followDistance\": 18.0, \"attackEnabled\": true }, \"configs\": [ { \"id\": \"main_stalker\", \"distanceBehindPlayer\": 3.0, \"attackEnabled\": false } ] }"
+            );
+
+            MissionEffect inline = new MissionEffect();
+            inline.type = "spawn_stalker";
+            inline.id = "main_stalker";
+            inline.args["type"] = inline.type;
+            inline.args["id"] = inline.id;
+            inline.args["followDistance"] = "12.0";
+
+            MissionEffectConfigLoader loader = new MissionEffectConfigLoader(root);
+            MissionEffect resolved = loader.Resolve(inline);
+
+            AssertEqual("3", resolved.GetFloat("distanceBehindPlayer", 0f).ToString("0"), "effect config id override wins over default");
+            AssertEqual("12", resolved.GetFloat("followDistance", 0f).ToString("0"), "inline effect args win over config values");
+            AssertEqual("false", resolved.GetBool("attackEnabled", true).ToString().ToLowerInvariant(), "id config can override default bools");
+            AssertEqual("main_stalker", resolved.id, "resolved effect keeps inline id");
+
+            Directory.Delete(root, true);
         }
 
         private static void TestStalkerStartsAttackBeforePretending()

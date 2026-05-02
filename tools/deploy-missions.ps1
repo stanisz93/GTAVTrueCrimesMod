@@ -10,6 +10,7 @@ $files = Get-ChildItem -LiteralPath $source -Filter "*.json" -File -Recurse |
     Where-Object { $_.Name -notlike "*.node-snippet.json" }
 $missionFiles = New-Object System.Collections.Generic.List[object]
 $subtitleFiles = New-Object System.Collections.Generic.List[object]
+$effectConfigFiles = New-Object System.Collections.Generic.List[object]
 $otherFiles = New-Object System.Collections.Generic.List[object]
 
 foreach ($file in $files) {
@@ -23,6 +24,9 @@ foreach ($file in $files) {
     if ($relativePath -like "subtitles\*" -or $relativePath -like "subtitles/*") {
         $subtitleFiles.Add($file) | Out-Null
     }
+    elseif ($relativePath -like "effects\*" -or $relativePath -like "effects/*") {
+        $effectConfigFiles.Add($file) | Out-Null
+    }
     elseif ($relativePath.IndexOf("\") -lt 0 -and $relativePath.IndexOf("/") -lt 0) {
         $missionFiles.Add($file) | Out-Null
     }
@@ -31,4 +35,4 @@ foreach ($file in $files) {
     }
 }
 
-Write-Host "Deployed $($missionFiles.Count) mission JSON file(s), $($subtitleFiles.Count) subtitle JSON file(s), and $($otherFiles.Count) other JSON file(s) to $destination"
+Write-Host "Deployed $($missionFiles.Count) mission JSON file(s), $($subtitleFiles.Count) subtitle JSON file(s), $($effectConfigFiles.Count) effect config JSON file(s), and $($otherFiles.Count) other JSON file(s) to $destination"
