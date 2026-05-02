@@ -11,6 +11,10 @@
 !/.vscode/tasks.json
 !/tools/
 !/tools/**
+/tools/voice_generator_config.json
+!/docs/
+/docs/*
+!/docs/voice-generation.md
 !/src/
 !/src/**
 !/tests/
@@ -31,6 +35,7 @@
 /missions/**/*.log
 /scripts/**/*.tmp
 /missions/**/*.tmp
+/missions/subtitles/*.node-snippet.json
 
 # Keep audio out for now
 /build-check/

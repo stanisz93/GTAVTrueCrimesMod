@@ -1,0 +1,49 @@
+﻿{
+    "audio":  "testing.wav",
+    "sourceText":  "inline",
+    "chunkDelimiter":  "|",
+    "subtitleOffsetMs":  300,
+    "generatedAtUtc":  "2026-05-02T08:27:20.0421346Z",
+    "subtitles":  [
+                      {
+                          "atMs":  300,
+                          "endMs":  1798,
+                          "text":  "Hi! Morgan here!"
+                      },
+                      {
+                          "atMs":  1844,
+                          "endMs":  3063,
+                          "text":  "Listen to me! ----"
+                      },
+                      {
+                          "atMs":  3307,
+                          "endMs":  4956,
+                          "text":  "Do not take the alley..."
+                      },
+                      {
+                          "atMs":  5199,
+                          "endMs":  6047,
+                          "text":  "Not tonight..."
+                      },
+                      {
+                          "atMs":  6291,
+                          "endMs":  7939,
+                          "text":  "Someone is following you..."
+                      },
+                      {
+                          "atMs":  8230,
+                          "endMs":  11155,
+                          "text":  "The second you leave the crowd, you make it easy..."
+                      },
+                      {
+                          "atMs":  11446,
+                          "endMs":  13802,
+                          "text":  "So please! Stay near people!"
+                      },
+                      {
+                          "atMs":  14244,
+                          "endMs":  17529,
+                          "text":  "Right now, witnesses are the only armor you have!"
+                      }
+                  ]
+}

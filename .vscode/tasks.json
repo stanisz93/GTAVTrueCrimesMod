@@ -17,7 +17,11 @@
     {
       "label": "build code",
       "type": "shell",
-      "command": "dotnet build",
+      "command": "dotnet",
+      "args": [
+        "build",
+        ".\\GTAVTrueCrimesMod.csproj"
+      ],
       "problemMatcher": "$msCompile"
     },
     {
@@ -30,6 +34,19 @@
         ".\\tests\\GTAVTrueCrimesMod.Tests.csproj"
       ],
       "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "test voice tools",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\tools\\test-voice-generation.ps1"
+      ],
+      "problemMatcher": []
     },
     {
       "label": "deploy missions",
@@ -45,11 +62,27 @@
       "problemMatcher": []
     },
     {
+      "label": "generate ElevenLabs voice",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\tools\\generate-elevenlabs-voice.ps1",
+        "-ConfigFile",
+        ".\\tools\\voice_generator_config.json"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "build",
       "dependsOrder": "sequence",
       "dependsOn": [
         "validate missions",
         "test logic",
+        "test voice tools",
         "build code",
         "deploy missions"
       ],

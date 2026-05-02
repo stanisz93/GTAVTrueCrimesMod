@@ -15,44 +15,8 @@
       "id": "warning_call",
       "type": "phone_call",
       "caller": "Nieznany numer",
-      "audio": "morgan_warning.wav",
-      "subtitles": [
-        {
-          "atMs": 0,
-          "text": "Cześć! Tu Morgan!",
-          "endMs": 1600
-        },
-        {
-          "atMs": 1700,
-          "text": "Posłuchaj mnie!",
-          "endMs": 2800
-        },
-        {
-          "atMs": 2900,
-          "text": "Nie idź alejką... Nie dziś wieczorem...",
-          "endMs": 5400
-        },
-        {
-          "atMs": 5500,
-          "text": "Ktoś cię śledzi...",
-          "endMs": 7300
-        },
-        {
-          "atMs": 7400,
-          "text": "W chwili, gdy opuścisz tłum, ułatwisz mu to...",
-          "endMs": 10400
-        },
-        {
-          "atMs": 10500,
-          "text": "Więc proszę... Trzymaj się blisko ludzi...",
-          "endMs": 13200
-        },
-        {
-          "atMs": 13300,
-          "text": "W tej chwili świadkowie to twoja jedyna broń!",
-          "endMs": 16800
-        }
-      ],
+      "audio": "morgan_warning_from_script.wav",
+      "subtitlesFile": "subtitles/morgan_warning_from_script.json",
       "next": "go_to_scene"
     },
     {

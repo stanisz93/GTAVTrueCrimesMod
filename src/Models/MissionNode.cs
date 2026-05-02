@@ -11,6 +11,7 @@ namespace GTAVTrueCrimesMod.Models
         public string next;
         public string caller;
         public string audio;
+        public string subtitlesFile;
         public MissionSubtitleCue[] subtitles;
         public int completeAfterMs;
         public MissionEffect[] onEnter;

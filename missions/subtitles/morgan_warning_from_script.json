@@ -1,0 +1,65 @@
+﻿{
+    "audio":  "testing.wav",
+    "sourceText":  "inline",
+    "chunkDelimiter":  "|",
+    "subtitleOffsetMs":  300,
+    "postprocessing":  {
+                           "enabled":  true,
+                           "only":  false,
+                           "outputSuffix":  "_phone",
+                           "telephone":  true,
+                           "noise":  0.012,
+                           "noiseProfile":  "phone",
+                           "hum":  0.0015,
+                           "pan":  -0.25,
+                           "volume":  1.08
+                       },
+    "generatedAtUtc":  "2026-05-02T08:57:34.1714216Z",
+    "subtitles":  [
+                      {
+                          "atMs":  300,
+                          "endMs":  1983,
+                          "text":  "Hi! Morgan here!"
+                      },
+                      {
+                          "atMs":  2018,
+                          "endMs":  3121,
+                          "text":  "Listen to me! ----"
+                      },
+                      {
+                          "atMs":  3284,
+                          "endMs":  4700,
+                          "text":  "Do not take the alley..."
+                      },
+                      {
+                          "atMs":  4863,
+                          "endMs":  5815,
+                          "text":  "Not tonight..."
+                      },
+                      {
+                          "atMs":  6059,
+                          "endMs":  7614,
+                          "text":  "Someone is following you..."
+                      },
+                      {
+                          "atMs":  8055,
+                          "endMs":  10633,
+                          "text":  "The second you leave the crowd, you make it easy..."
+                      },
+                      {
+                          "atMs":  10726,
+                          "endMs":  12897,
+                          "text":  "So please! Stay near people!"
+                      },
+                      {
+                          "atMs":  13106,
+                          "endMs":  16299,
+                          "text":  "Right now, witnesses are the only armor you have!"
+                      },
+                      {
+                          "atMs":  16391,
+                          "endMs":  19712,
+                          "text":  "Try to reach point on the map, I will handle it there."
+                      }
+                  ]
+}

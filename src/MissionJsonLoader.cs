@@ -84,7 +84,7 @@ namespace GTAVTrueCrimesMod
                 mission.startLocation.y = ReadJsonFloat(startLocationJson, "y", 0f);
                 mission.startLocation.z = ReadJsonFloat(startLocationJson, "z", 0f);
 
-                mission.nodes = ReadMissionNodes(json);
+                mission.nodes = ReadMissionNodes(json, Path.GetDirectoryName(filePath));
 
                 string firstObjectiveFromArray = ReadJsonString(json, "text");
 
@@ -100,7 +100,7 @@ namespace GTAVTrueCrimesMod
             }
         }
 
-        private MissionNode[] ReadMissionNodes(string json)
+        private MissionNode[] ReadMissionNodes(string json, string missionFolder)
         {
             try
             {
@@ -125,7 +125,12 @@ namespace GTAVTrueCrimesMod
                     node.next = ReadJsonString(nodeJson, "next");
                     node.caller = ReadJsonString(nodeJson, "caller");
                     node.audio = ReadJsonString(nodeJson, "audio");
+                    node.subtitlesFile = ReadJsonString(nodeJson, "subtitlesFile");
                     node.subtitles = ReadSubtitleCues(nodeJson, "subtitles");
+
+                    if (!string.IsNullOrEmpty(node.subtitlesFile))
+                        node.subtitles = ReadSubtitleCuesFile(missionFolder, node.subtitlesFile);
+
                     node.completeAfterMs = ReadJsonInt(nodeJson, "completeAfterMs", 0);
                     node.onEnter = ReadMissionEffects(nodeJson, "onEnter");
 
@@ -160,34 +165,77 @@ namespace GTAVTrueCrimesMod
                 if (string.IsNullOrEmpty(cuesJson))
                     return new MissionSubtitleCue[0];
 
-                List<string> cueObjects = SplitJsonObjects(cuesJson);
-                List<MissionSubtitleCue> cues = new List<MissionSubtitleCue>();
-
-                for (int i = 0; i < cueObjects.Count; i++)
-                {
-                    string cueJson = cueObjects[i];
-                    MissionSubtitleCue cue = new MissionSubtitleCue();
-
-                    cue.atMs = ReadJsonInt(cueJson, "atMs", 0);
-                    int endMs = ReadJsonInt(cueJson, "endMs", 0);
-
-                    if (endMs > cue.atMs)
-                        cue.durationMs = endMs - cue.atMs;
-                    else
-                        cue.durationMs = ReadJsonInt(cueJson, "durationMs", 2500);
-
-                    cue.text = ReadJsonString(cueJson, "text");
-
-                    if (!string.IsNullOrEmpty(cue.text))
-                        cues.Add(cue);
-                }
-
-                return cues.ToArray();
+                return ReadSubtitleCueArray(cuesJson);
             }
             catch
             {
                 return new MissionSubtitleCue[0];
             }
+        }
+
+        private MissionSubtitleCue[] ReadSubtitleCuesFile(string missionFolder, string subtitlesFile)
+        {
+            try
+            {
+                string path = subtitlesFile;
+
+                if (!Path.IsPathRooted(path))
+                    path = Path.Combine(missionFolder, subtitlesFile);
+
+                if (!File.Exists(path))
+                    return new MissionSubtitleCue[0];
+
+                string json = ReadAllTextShared(path).Trim();
+                string cuesJson = json;
+
+                if (json.StartsWith("["))
+                {
+                    int end = FindMatching(json, 0, '[', ']');
+
+                    if (end >= 0)
+                        cuesJson = json.Substring(1, end - 1);
+                }
+                else
+                {
+                    cuesJson = ReadJsonArray(json, "subtitles");
+                }
+
+                return ReadSubtitleCueArray(cuesJson);
+            }
+            catch
+            {
+                return new MissionSubtitleCue[0];
+            }
+        }
+
+        private MissionSubtitleCue[] ReadSubtitleCueArray(string cuesJson)
+        {
+            if (string.IsNullOrEmpty(cuesJson))
+                return new MissionSubtitleCue[0];
+
+            List<string> cueObjects = SplitJsonObjects(cuesJson);
+            List<MissionSubtitleCue> cues = new List<MissionSubtitleCue>();
+
+            for (int i = 0; i < cueObjects.Count; i++)
+            {
+                string cueJson = cueObjects[i];
+                MissionSubtitleCue cue = new MissionSubtitleCue();
+
+                cue.atMs = ReadJsonInt(cueJson, "atMs", 0);
+                int endMs = ReadJsonInt(cueJson, "endMs", 0);
+
+                if (endMs > cue.atMs)
+                    cue.durationMs = endMs - cue.atMs;
+                else
+                    cue.durationMs = ReadJsonInt(cueJson, "durationMs", 2500);
+
+                cue.text = ReadJsonString(cueJson, "text");
+
+                if (!string.IsNullOrEmpty(cue.text))
+                    cues.Add(cue);
+            }
+
+            return cues.ToArray();
         }
 
         private MissionEffect[] ReadMissionEffects(string json, string key)

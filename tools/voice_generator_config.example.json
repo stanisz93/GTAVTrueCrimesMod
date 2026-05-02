@@ -1,0 +1,37 @@
+{
+  "voiceConfig": {
+    "outName": "morgan_warning",
+    "text": "Cześć. Tu Morgan. | Posłuchaj mnie. | Nie idź alejką. Nie dziś wieczorem. | Ktoś cię śledzi. | W chwili, gdy opuścisz tłum, ułatwisz mu to. | Więc proszę, trzymaj się blisko ludzi. | W tej chwili świadkowie to twoja jedyna broń.",
+    "chunkDelimiter": "|",
+    "subtitleOffsetMs": 0,
+    "onlyPostprocessing": false,
+    "audioDir": ".\\audio",
+    "subtitleDir": ".\\missions\\subtitles",
+    "ffmpegPath": ""
+  },
+  "elevenLabs": {
+    "apiKey": "",
+    "voiceId": "YOUR_VOICE_ID",
+    "modelId": "eleven_multilingual_v2",
+    "languageCode": "pl",
+    "outputFormat": "mp3_44100_192",
+    "convertToWav": true,
+    "voiceSettings": {
+      "speed": 0.73,
+      "stability": 0.70,
+      "similarityBoost": 0.78,
+      "style": 0.0,
+      "useSpeakerBoost": true
+    }
+  },
+  "postprocessing": {
+    "enabled": false,
+    "outputSuffix": "_phone",
+    "telephone": true,
+    "noiseProfile": "phone",
+    "noise": 0.012,
+    "hum": 0.0015,
+    "pan": -0.25,
+    "volume": 1.08
+  }
+}

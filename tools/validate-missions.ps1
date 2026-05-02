@@ -32,6 +32,64 @@ function Has-Property {
     return $null -ne $Object.PSObject.Properties[$Name]
 }
 
+function Test-SpeakableText {
+    param([string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $false
+    }
+
+    for ($i = 0; $i -lt $Text.Length; $i++) {
+        if ([char]::IsLetterOrDigit($Text[$i])) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Test-SubtitleCues {
+    param(
+        [string]$FileName,
+        [string]$NodeId,
+        [object[]]$Cues
+    )
+
+    $lastAt = -1
+
+    foreach ($cue in $Cues) {
+        if (-not (Has-Property $cue "atMs")) {
+            Add-Error $FileName "phone_call '$NodeId' subtitle missing atMs"
+            continue
+        }
+
+        if ($cue.atMs -lt $lastAt) {
+            Add-Error $FileName "phone_call '$NodeId' subtitles are not sorted by atMs"
+        }
+
+        $lastAt = $cue.atMs
+
+        if ((Has-Property $cue "endMs") -and $cue.endMs -le $cue.atMs) {
+            Add-Error $FileName "phone_call '$NodeId' subtitle endMs must be greater than atMs"
+        }
+
+        if ((Has-Property $cue "durationMs") -and $cue.durationMs -le 0) {
+            Add-Error $FileName "phone_call '$NodeId' subtitle durationMs must be positive"
+        }
+
+        if (-not (Has-Property $cue "endMs") -and -not (Has-Property $cue "durationMs")) {
+            Add-Error $FileName "phone_call '$NodeId' subtitle requires endMs or durationMs"
+        }
+
+        if (-not (Has-Property $cue "text") -or [string]::IsNullOrWhiteSpace($cue.text)) {
+            Add-Error $FileName "phone_call '$NodeId' subtitle missing text"
+        }
+        elseif (-not (Test-SpeakableText $cue.text)) {
+            Add-Error $FileName "phone_call '$NodeId' subtitle '$($cue.text)' has no speakable text"
+        }
+    }
+}
+
 if (-not (Test-Path -LiteralPath $missionsDir)) {
     throw "Missions folder not found: $missionsDir"
 }
@@ -120,34 +178,29 @@ foreach ($file in $files) {
             }
 
             if ((Has-Property $node "subtitles") -and $null -ne $node.subtitles) {
-                $lastAt = -1
+                Test-SubtitleCues $file.Name $node.id @($node.subtitles)
+            }
 
-                foreach ($cue in $node.subtitles) {
-                    if (-not (Has-Property $cue "atMs")) {
-                        Add-Error $file.Name "phone_call '$($node.id)' subtitle missing atMs"
-                        continue
+            if ((Has-Property $node "subtitlesFile") -and -not [string]::IsNullOrWhiteSpace($node.subtitlesFile)) {
+                $subtitlePath = Join-Path $file.DirectoryName $node.subtitlesFile
+
+                if (-not (Test-Path -LiteralPath $subtitlePath)) {
+                    Add-Error $file.Name "phone_call '$($node.id)' subtitlesFile '$($node.subtitlesFile)' does not exist"
+                }
+                else {
+                    try {
+                        $subtitleJson = Get-Content -LiteralPath $subtitlePath -Raw | ConvertFrom-Json
+                        $subtitleCues = if ($subtitleJson -is [array]) { $subtitleJson } else { $subtitleJson.subtitles }
+
+                        if ($null -eq $subtitleCues -or $subtitleCues.Count -eq 0) {
+                            Add-Error $file.Name "phone_call '$($node.id)' subtitlesFile '$($node.subtitlesFile)' has no subtitles"
+                        }
+                        else {
+                            Test-SubtitleCues $file.Name $node.id @($subtitleCues)
+                        }
                     }
-
-                    if ($cue.atMs -lt $lastAt) {
-                        Add-Error $file.Name "phone_call '$($node.id)' subtitles are not sorted by atMs"
-                    }
-
-                    $lastAt = $cue.atMs
-
-                    if ((Has-Property $cue "endMs") -and $cue.endMs -le $cue.atMs) {
-                        Add-Error $file.Name "phone_call '$($node.id)' subtitle endMs must be greater than atMs"
-                    }
-
-                    if ((Has-Property $cue "durationMs") -and $cue.durationMs -le 0) {
-                        Add-Error $file.Name "phone_call '$($node.id)' subtitle durationMs must be positive"
-                    }
-
-                    if (-not (Has-Property $cue "endMs") -and -not (Has-Property $cue "durationMs")) {
-                        Add-Error $file.Name "phone_call '$($node.id)' subtitle requires endMs or durationMs"
-                    }
-
-                    if (-not (Has-Property $cue "text") -or [string]::IsNullOrWhiteSpace($cue.text)) {
-                        Add-Error $file.Name "phone_call '$($node.id)' subtitle missing text"
+                    catch {
+                        Add-Error $file.Name "phone_call '$($node.id)' invalid subtitlesFile '$($node.subtitlesFile)': $($_.Exception.Message)"
                     }
                 }
             }
