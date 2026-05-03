@@ -7,8 +7,22 @@ using System;
 
 namespace GTAVTrueCrimesMod.Behaviors
 {
-    public class StalkerBehavior : IMissionBackgroundBehavior
+    public class StalkerBehavior : IMissionBackgroundBehavior, IScriptedMissionKillTarget
     {
+        private static readonly string[] PretendPhoneSpeechLines = new[]
+        {
+            "GENERIC_HI",
+            "GENERIC_HOWS_IT_GOING",
+            "GENERIC_YES",
+            "GENERIC_NO",
+            "GENERIC_THANKS",
+            "GENERIC_BYE",
+            "GENERIC_WHATEVER",
+            "GENERIC_SHOCKED_MED",
+            "GENERIC_CURSE_MED",
+            "CHAT_STATE"
+        };
+
         private readonly string id;
         private readonly float distanceBehindPlayer;
         private readonly bool attackEnabled;
@@ -26,12 +40,23 @@ namespace GTAVTrueCrimesMod.Behaviors
         private readonly int pretendDurationMs;
         private readonly int attackDamage;
         private readonly int attackDamageIntervalMs;
+        private readonly int playerDamageMemoryMs;
+        private readonly MissionEffect[] onKilledByPlayer;
+        private readonly MissionEffect[] onKilledByOther;
         private readonly StalkerDecisionConfig decisionConfig;
         private readonly Random rng = new Random();
 
         private Ped stalker;
         private bool pretending;
         private bool attacking;
+        private bool deathHandled;
+        private bool scriptedKillPending;
+        private bool scriptedKilledByOther;
+        private int lastPlayerDamageAt;
+        private int scriptedKillNextShotAt;
+        private int scriptedKillShotsRemaining;
+        private int scriptedKillShotGapMs;
+        private int scriptedKillDamage;
         private string state = "not_spawned";
         private int pretendMode;
         private int pretendUntil;
@@ -46,6 +71,7 @@ namespace GTAVTrueCrimesMod.Behaviors
         private int nextPretendPhoneMoveAt;
         private bool pretendPhoneWalking;
         private PhonePropAnimation pretendPhoneAnimation;
+        private string lastPretendPhoneSpeechLine = "";
         private Vector3 currentPretendDirection;
         private Vector3 currentPretendDestination;
         private int lastWitnessCount;
@@ -76,6 +102,9 @@ namespace GTAVTrueCrimesMod.Behaviors
             pretendDurationMs = config == null ? 5000 : Math.Max(500, config.GetInt("pretendDurationMs", 5000));
             attackDamage = config == null ? 0 : Math.Max(0, config.GetInt("attackDamage", 0));
             attackDamageIntervalMs = config == null ? 450 : Math.Max(100, config.GetInt("attackDamageIntervalMs", 450));
+            playerDamageMemoryMs = config == null ? 5000 : Math.Max(0, config.GetInt("playerDamageMemoryMs", 5000));
+            onKilledByPlayer = config == null || config.onKilledByPlayer == null ? new MissionEffect[0] : config.onKilledByPlayer;
+            onKilledByOther = config == null || config.onKilledByOther == null ? new MissionEffect[0] : config.onKilledByOther;
             decisionConfig = CreateDecisionConfig();
         }
 
@@ -108,6 +137,14 @@ namespace GTAVTrueCrimesMod.Behaviors
         public void Tick(MissionRuntime runtime)
         {
             if (!EnsureStalkerExists())
+                return;
+
+            TrackPlayerDamage();
+
+            if (HandleStalkerDeath(runtime))
+                return;
+
+            if (TickScriptedKillByOther())
                 return;
 
             StalkerTickContext context = CaptureTickContext();
@@ -274,6 +311,14 @@ namespace GTAVTrueCrimesMod.Behaviors
 
             pretending = false;
             attacking = false;
+            deathHandled = false;
+            scriptedKillPending = false;
+            scriptedKilledByOther = false;
+            lastPlayerDamageAt = 0;
+            scriptedKillNextShotAt = 0;
+            scriptedKillShotsRemaining = 0;
+            scriptedKillShotGapMs = 0;
+            scriptedKillDamage = 0;
             state = "cleared";
             lastMovementState = "cleared";
             pretendMode = 0;
@@ -320,6 +365,14 @@ namespace GTAVTrueCrimesMod.Behaviors
             stalker.IsPersistent = true;
             pretending = false;
             attacking = false;
+            deathHandled = false;
+            scriptedKillPending = false;
+            scriptedKilledByOther = false;
+            lastPlayerDamageAt = 0;
+            scriptedKillNextShotAt = 0;
+            scriptedKillShotsRemaining = 0;
+            scriptedKillShotGapMs = 0;
+            scriptedKillDamage = 0;
             state = "spawned";
             lastMovementState = "spawned";
             nextDamageAt = 0;
@@ -332,6 +385,253 @@ namespace GTAVTrueCrimesMod.Behaviors
             ResetPretendPhoneState();
 
             GTA.UI.Screen.ShowSubtitle("Nieznajomy wtapia sie w tlum.", 4000);
+        }
+
+        private void TrackPlayerDamage()
+        {
+            if (stalker == null || !stalker.Exists() || deathHandled)
+                return;
+
+            try
+            {
+                Ped player = Game.Player.Character;
+
+                if (player != null && player.Exists() && stalker.HasBeenDamagedBy(player))
+                {
+                    lastPlayerDamageAt = Game.GameTime;
+                    stalker.ClearLastWeaponDamage();
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private bool HandleStalkerDeath(MissionRuntime runtime)
+        {
+            if (stalker == null || !stalker.Exists())
+                return false;
+
+            if (!stalker.IsDead && stalker.Health > 0)
+                return false;
+
+            if (deathHandled)
+                return true;
+
+            deathHandled = true;
+            scriptedKillPending = false;
+            attacking = false;
+            StopPretendPhoneCall();
+
+            bool killedByPlayer = WasKilledByPlayer();
+            state = killedByPlayer ? "killed_by_player" : "killed_by_other";
+            lastMovementState = state;
+
+            MissionEffect[] effects = killedByPlayer ? onKilledByPlayer : onKilledByOther;
+
+            if (effects != null && effects.Length > 0)
+                runtime.RunEffects(effects);
+
+            return true;
+        }
+
+        private bool WasKilledByPlayer()
+        {
+            try
+            {
+                if (scriptedKilledByOther)
+                    return false;
+
+                Ped player = Game.Player.Character;
+                Entity killer = stalker.Killer;
+
+                if (killer != null && killer.Exists())
+                {
+                    if (player != null && player.Exists() && killer.Handle == player.Handle)
+                        return true;
+
+                    if (player != null && player.Exists() && player.IsInVehicle())
+                    {
+                        Vehicle vehicle = player.CurrentVehicle;
+
+                        if (vehicle != null && vehicle.Exists() && killer.Handle == vehicle.Handle)
+                            return true;
+                    }
+                }
+
+                if (lastPlayerDamageAt > 0 && Game.GameTime - lastPlayerDamageAt <= playerDamageMemoryMs)
+                    return true;
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
+        public bool BeginScriptedKillByOther(int shotCount, int shotGapMs, int damage)
+        {
+            if (stalker == null || !stalker.Exists() || deathHandled)
+                return false;
+
+            if (stalker.IsDead || stalker.Health <= 0)
+                return false;
+
+            scriptedKillPending = true;
+            scriptedKilledByOther = true;
+            scriptedKillNextShotAt = Game.GameTime;
+            scriptedKillShotsRemaining = Math.Max(1, shotCount);
+            scriptedKillShotGapMs = Math.Max(0, shotGapMs);
+            scriptedKillDamage = Math.Max(1, damage);
+            attacking = false;
+
+            StopPretendPhoneCall();
+            ResetPretendMovementState();
+
+            state = "scripted_shot_pending";
+            lastMovementState = state;
+
+            try
+            {
+                stalker.Task.ClearAll();
+            }
+            catch
+            {
+            }
+
+            return true;
+        }
+
+        public bool IsNearPosition(Vector3 position, float distance)
+        {
+            if (stalker == null || !stalker.Exists())
+                return false;
+
+            float radius = Math.Max(0.1f, distance);
+            return stalker.Position.DistanceTo(position) <= radius;
+        }
+
+        private bool TickScriptedKillByOther()
+        {
+            if (!scriptedKillPending)
+                return false;
+
+            state = "scripted_shot";
+            lastMovementState = state;
+
+            if (stalker == null || !stalker.Exists() || stalker.IsDead || stalker.Health <= 0)
+            {
+                scriptedKillPending = false;
+                return true;
+            }
+
+            if (Game.GameTime < scriptedKillNextShotAt)
+                return true;
+
+            FireScriptedShot();
+            scriptedKillShotsRemaining--;
+
+            if (scriptedKillShotsRemaining <= 0)
+            {
+                ApplyScriptedShotKill();
+                scriptedKillPending = false;
+                return true;
+            }
+
+            scriptedKillNextShotAt = Game.GameTime + scriptedKillShotGapMs;
+            return true;
+        }
+
+        private void FireScriptedShot()
+        {
+            if (stalker == null || !stalker.Exists())
+                return;
+
+            try
+            {
+                Vector3 target = stalker.Position + new Vector3(0f, 0f, 1.05f);
+                Vector3 source = GetScriptedShotSource(target);
+
+                Function.Call(
+                    Hash.SHOOT_SINGLE_BULLET_BETWEEN_COORDS,
+                    source.X,
+                    source.Y,
+                    source.Z,
+                    target.X,
+                    target.Y,
+                    target.Z,
+                    scriptedKillDamage,
+                    true,
+                    (uint)WeaponHash.Pistol,
+                    0,
+                    true,
+                    false,
+                    2000.0f
+                );
+            }
+            catch
+            {
+            }
+        }
+
+        private Vector3 GetScriptedShotSource(Vector3 target)
+        {
+            try
+            {
+                Ped player = Game.Player.Character;
+                Vector3 toStalkerFromPlayer = target - player.Position;
+                toStalkerFromPlayer = new Vector3(toStalkerFromPlayer.X, toStalkerFromPlayer.Y, 0f);
+
+                if (toStalkerFromPlayer.Length() <= 0.01f)
+                    toStalkerFromPlayer = player.ForwardVector;
+
+                toStalkerFromPlayer.Normalize();
+
+                Vector3 side = new Vector3(-toStalkerFromPlayer.Y, toStalkerFromPlayer.X, 0f);
+
+                if (side.Length() <= 0.01f)
+                    side = player.RightVector;
+
+                side.Normalize();
+
+                Vector3 playerToSide = target + side * 18f - player.Position;
+                playerToSide = new Vector3(playerToSide.X, playerToSide.Y, 0f);
+
+                if (playerToSide.Length() > 0.01f)
+                {
+                    playerToSide.Normalize();
+
+                    if (playerToSide.X * side.X + playerToSide.Y * side.Y < 0f)
+                        side = -side;
+                }
+
+                return target + side * 18f + new Vector3(0f, 0f, 2.8f);
+            }
+            catch
+            {
+                return target + new Vector3(18f, 0f, 2.8f);
+            }
+        }
+
+        private void ApplyScriptedShotKill()
+        {
+            if (stalker == null || !stalker.Exists())
+                return;
+
+            try
+            {
+                stalker.Health = 0;
+            }
+            catch
+            {
+                try
+                {
+                    Function.Call(Hash.SET_ENTITY_HEALTH, stalker.Handle, 0);
+                }
+                catch
+                {
+                }
+            }
         }
 
         private void StartPretending()
@@ -803,29 +1103,44 @@ namespace GTAVTrueCrimesMod.Behaviors
                 return;
 
             nextPretendPhoneSpeechAt = Game.GameTime + rng.Next(3500, 7000);
-
-            string[] lines = new[]
-            {
-                "GENERIC_HI",
-                "GENERIC_YES",
-                "GENERIC_NO",
-                "GENERIC_THANKS",
-                "GENERIC_BYE",
-                "CHAT_STATE"
-            };
+            string line = ChoosePretendPhoneSpeechLine();
 
             try
             {
                 Function.Call(
                     Hash.PLAY_PED_AMBIENT_SPEECH_NATIVE,
                     stalker.Handle,
-                    lines[rng.Next(0, lines.Length)],
+                    line,
                     "SPEECH_PARAMS_FORCE_NORMAL_CLEAR"
                 );
             }
             catch
             {
             }
+        }
+
+        private string ChoosePretendPhoneSpeechLine()
+        {
+            if (PretendPhoneSpeechLines.Length == 0)
+                return "CHAT_STATE";
+
+            if (PretendPhoneSpeechLines.Length == 1)
+            {
+                lastPretendPhoneSpeechLine = PretendPhoneSpeechLines[0];
+                return lastPretendPhoneSpeechLine;
+            }
+
+            string line = lastPretendPhoneSpeechLine;
+            int guard = 0;
+
+            while (line == lastPretendPhoneSpeechLine && guard < 8)
+            {
+                line = PretendPhoneSpeechLines[rng.Next(0, PretendPhoneSpeechLines.Length)];
+                guard++;
+            }
+
+            lastPretendPhoneSpeechLine = line;
+            return line;
         }
 
         private void PlayPretendPhoneHoldAnimation(int durationMs)
@@ -869,6 +1184,7 @@ namespace GTAVTrueCrimesMod.Behaviors
             nextPretendPhoneSpeechAt = 0;
             nextPretendPhoneMoveAt = 0;
             pretendPhoneWalking = false;
+            lastPretendPhoneSpeechLine = "";
         }
 
         private PhonePropAnimation EnsurePretendPhoneAnimation()

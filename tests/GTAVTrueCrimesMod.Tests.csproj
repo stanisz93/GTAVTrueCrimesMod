@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <Compile Include="..\src\Models\MissionNode.cs" Link="Models\MissionNode.cs" />
+    <Compile Include="..\src\Models\MissionAudioSegment.cs" Link="Models\MissionAudioSegment.cs" />
     <Compile Include="..\src\Models\MissionSubtitleCue.cs" Link="Models\MissionSubtitleCue.cs" />
     <Compile Include="..\src\Models\JsonVector3.cs" Link="Models\JsonVector3.cs" />
     <Compile Include="..\src\Models\MissionEffect.cs" Link="Models\MissionEffect.cs" />

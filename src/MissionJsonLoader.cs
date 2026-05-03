@@ -131,8 +131,9 @@ namespace GTAVTrueCrimesMod
                     if (!string.IsNullOrEmpty(node.subtitlesFile))
                         node.subtitles = ReadSubtitleCuesFile(missionFolder, node.subtitlesFile);
 
+                    node.audioSegments = ReadAudioSegments(nodeJson, missionFolder);
                     node.completeAfterMs = ReadJsonInt(nodeJson, "completeAfterMs", 0);
-                    node.onEnter = ReadMissionEffects(nodeJson, "onEnter");
+                    node.onEnter = ReadMissionEffects(nodeJson, "onEnter", missionFolder);
 
                     string targetJson = ReadJsonObject(nodeJson, "target");
 
@@ -238,7 +239,7 @@ namespace GTAVTrueCrimesMod
             return cues.ToArray();
         }
 
-        private MissionEffect[] ReadMissionEffects(string json, string key)
+        private MissionEffect[] ReadMissionEffects(string json, string key, string missionFolder)
         {
             try
             {
@@ -252,12 +253,7 @@ namespace GTAVTrueCrimesMod
 
                 for (int i = 0; i < effectObjects.Count; i++)
                 {
-                    string effectJson = effectObjects[i];
-                    MissionEffect effect = new MissionEffect();
-
-                    effect.args = ReadFlatJsonValues(effectJson);
-                    effect.type = effect.GetString("type", "");
-                    effect.id = effect.GetString("id", "");
+                    MissionEffect effect = ReadMissionEffect(effectObjects[i], missionFolder);
 
                     if (!string.IsNullOrEmpty(effect.type))
                         effects.Add(effect);
@@ -268,6 +264,71 @@ namespace GTAVTrueCrimesMod
             catch
             {
                 return new MissionEffect[0];
+            }
+        }
+
+        private MissionEffect ReadMissionEffect(string effectJson, string missionFolder)
+        {
+            MissionEffect effect = new MissionEffect();
+
+            effect.args = ReadFlatJsonValues(effectJson);
+            effect.type = effect.GetString("type", "");
+            effect.id = effect.GetString("id", "");
+            effect.subtitles = ReadSubtitleCues(effectJson, "subtitles");
+
+            string subtitlesFile = effect.GetString("subtitlesFile", "");
+
+            if (!string.IsNullOrEmpty(subtitlesFile))
+                effect.subtitles = ReadSubtitleCuesFile(missionFolder, subtitlesFile);
+
+            effect.audioSegments = ReadAudioSegments(effectJson, missionFolder);
+            effect.onKilledByPlayer = ReadMissionEffects(effectJson, "onKilledByPlayer", missionFolder);
+            effect.onKilledByOther = ReadMissionEffects(effectJson, "onKilledByOther", missionFolder);
+
+            return effect;
+        }
+
+        private MissionAudioSegment[] ReadAudioSegments(string json, string missionFolder)
+        {
+            try
+            {
+                string segmentsJson = ReadJsonArray(json, "audioSegments");
+
+                if (string.IsNullOrEmpty(segmentsJson))
+                    return new MissionAudioSegment[0];
+
+                List<string> segmentObjects = SplitJsonObjects(segmentsJson);
+                List<MissionAudioSegment> segments = new List<MissionAudioSegment>();
+
+                for (int i = 0; i < segmentObjects.Count; i++)
+                {
+                    string segmentJson = segmentObjects[i];
+                    MissionAudioSegment segment = new MissionAudioSegment();
+
+                    segment.audio = ReadJsonString(segmentJson, "audio");
+                    segment.text = ReadJsonString(segmentJson, "text");
+                    segment.subtitlesFile = ReadJsonString(segmentJson, "subtitlesFile");
+                    segment.subtitles = ReadSubtitleCues(segmentJson, "subtitles");
+                    segment.completeAfterMs = ReadJsonInt(segmentJson, "completeAfterMs", 0);
+                    segment.gapAfterMs = ReadJsonInt(segmentJson, "gapAfterMs", 0);
+
+                    if (!string.IsNullOrEmpty(segment.subtitlesFile))
+                        segment.subtitles = ReadSubtitleCuesFile(missionFolder, segment.subtitlesFile);
+
+                    if (!string.IsNullOrEmpty(segment.audio) ||
+                        !string.IsNullOrEmpty(segment.text) ||
+                        (segment.subtitles != null && segment.subtitles.Length > 0) ||
+                        segment.completeAfterMs > 0)
+                    {
+                        segments.Add(segment);
+                    }
+                }
+
+                return segments.ToArray();
+            }
+            catch
+            {
+                return new MissionAudioSegment[0];
             }
         }
 

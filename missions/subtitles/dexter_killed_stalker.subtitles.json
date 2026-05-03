@@ -1,0 +1,30 @@
+﻿{
+    "audio":  "dexter_killed_stalker_2.wav",
+    "sourceText":  "inline",
+    "chunkDelimiter":  "|",
+    "subtitleOffsetMs":  300,
+    "postprocessing":  {
+                           "enabled":  true,
+                           "onlyPostprocessing":  false,
+                           "outputSuffix":  "_phone",
+                           "telephone":  true,
+                           "noise":  0.012,
+                           "noiseProfile":  "phone",
+                           "hum":  0.0015,
+                           "pan":  -0.25,
+                           "volume":  1.08
+                       },
+    "generatedAtUtc":  "2026-05-03T07:51:07.6247898Z",
+    "subtitles":  [
+                      {
+                          "atMs":  300,
+                          "endMs":  3946,
+                          "text":  "He was too close.  And I was tired of watching him breathe."
+                      },
+                      {
+                          "atMs":  4178,
+                          "endMs":  5362,
+                          "text":  "Search the body."
+                      }
+                  ]
+}

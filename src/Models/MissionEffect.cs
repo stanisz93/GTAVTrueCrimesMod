@@ -9,6 +9,10 @@ namespace GTAVTrueCrimesMod.Models
         public string type;
         public string id;
         public Dictionary<string, string> args = new Dictionary<string, string>();
+        public MissionSubtitleCue[] subtitles;
+        public MissionAudioSegment[] audioSegments;
+        public MissionEffect[] onKilledByPlayer;
+        public MissionEffect[] onKilledByOther;
 
         public string GetString(string key, string fallback)
         {

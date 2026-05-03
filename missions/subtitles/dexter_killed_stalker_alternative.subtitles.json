@@ -1,0 +1,35 @@
+﻿{
+    "audio":  "dexter_killed_stalker.wav",
+    "sourceText":  "inline",
+    "chunkDelimiter":  "|",
+    "subtitleOffsetMs":  300,
+    "postprocessing":  {
+                           "enabled":  true,
+                           "onlyPostprocessing":  false,
+                           "outputSuffix":  "_phone",
+                           "telephone":  true,
+                           "noise":  0.012,
+                           "noiseProfile":  "phone",
+                           "hum":  0.0015,
+                           "pan":  -0.25,
+                           "volume":  1.08
+                       },
+    "generatedAtUtc":  "2026-05-03T07:47:04.2382561Z",
+    "subtitles":  [
+                      {
+                          "atMs":  300,
+                          "endMs":  2587,
+                          "text":  "So... I guess you heard the shot..."
+                      },
+                      {
+                          "atMs":  2622,
+                          "endMs":  5269,
+                          "text":  "You saw the result... That is all you need to know."
+                      },
+                      {
+                          "atMs":  5327,
+                          "endMs":  6662,
+                          "text":  "Now... search him!!!"
+                      }
+                  ]
+}

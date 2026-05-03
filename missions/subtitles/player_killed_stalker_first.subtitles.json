@@ -1,0 +1,40 @@
+﻿{
+    "audio":  "player_killed_stalker_first.wav",
+    "sourceText":  "inline",
+    "chunkDelimiter":  "|",
+    "subtitleOffsetMs":  300,
+    "postprocessing":  {
+                           "enabled":  true,
+                           "onlyPostprocessing":  false,
+                           "outputSuffix":  "_phone",
+                           "telephone":  true,
+                           "noise":  0.012,
+                           "noiseProfile":  "phone",
+                           "hum":  0.0015,
+                           "pan":  -0.25,
+                           "volume":  1.08
+                       },
+    "generatedAtUtc":  "2026-05-02T09:25:39.8260299Z",
+    "subtitles":  [
+                      {
+                          "atMs":  300,
+                          "endMs":  2610,
+                          "text":  "That was efficient, I must say..."
+                      },
+                      {
+                          "atMs":  3133,
+                          "endMs":  4654,
+                          "text":  "I had instructions ready..."
+                      },
+                      {
+                          "atMs":  4863,
+                          "endMs":  7626,
+                          "text":  "but apparently, you solved the problem early..."
+                      },
+                      {
+                          "atMs":  7870,
+                          "endMs":  8706,
+                          "text":  "Noted!"
+                      }
+                  ]
+}

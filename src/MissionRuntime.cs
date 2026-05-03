@@ -27,13 +27,15 @@ namespace GTAVTrueCrimesMod
         private Blip currentNodeBlip;
         private readonly List<IMissionNodeHandler> nodeHandlers = new List<IMissionNodeHandler>();
         private readonly List<IMissionEffectHandler> effectHandlers = new List<IMissionEffectHandler>();
-        private readonly List<IMissionBackgroundBehavior> backgroundBehaviors = new List<IMissionBackgroundBehavior>();
+        private readonly List<BackgroundBehaviorRegistration> backgroundBehaviors = new List<BackgroundBehaviorRegistration>();
         private readonly MissionPhoneCallController phoneCall = new MissionPhoneCallController();
         private MissionEffectConfigLoader effectConfigLoader;
+        private bool phoneCallCompletesCurrentNode;
         private bool nativeRingtonePlaying;
         private bool playerPhoneAnimationActive;
         private PhonePropAnimation playerPhoneAnimation;
         private SoundPlayer activeCallPlayer;
+        private MemoryStream activeCallAudioStream;
 
         private bool missionFailed = false;
         private string missionFailureReason = "";
@@ -42,7 +44,10 @@ namespace GTAVTrueCrimesMod
         {
             nodeHandlers.Add(new PhoneCallNodeHandler());
             nodeHandlers.Add(new DefaultNodeHandler());
+            effectHandlers.Add(new SetFactEffectHandler());
+            effectHandlers.Add(new PhoneCallEffectHandler());
             effectHandlers.Add(new SpawnStalkerEffectHandler());
+            effectHandlers.Add(new ScriptedStalkerShotEffectHandler());
         }
 
         public DetectiveMission ActiveMission
@@ -146,6 +151,9 @@ namespace GTAVTrueCrimesMod
             if (pushHistory && !string.IsNullOrEmpty(currentNodeId))
                 nodeHistory.Push(currentNodeId);
 
+            if (!string.IsNullOrEmpty(currentNodeId) && currentNodeId != nodeId)
+                ClearBackgroundBehaviorsForNode(currentNodeId);
+
             currentNodeId = nodeId;
             currentNode = node;
             ResetNodeTimers();
@@ -206,7 +214,7 @@ namespace GTAVTrueCrimesMod
                 return;
 
             for (int i = 0; i < backgroundBehaviors.Count; i++)
-                backgroundBehaviors[i].Tick(this);
+                backgroundBehaviors[i].Behavior.Tick(this);
         }
 
         public void CompleteCurrentNode()
@@ -229,6 +237,7 @@ namespace GTAVTrueCrimesMod
                 return;
             }
 
+            ClearBackgroundBehaviorsForNode(currentNodeId);
             GTA.UI.Screen.ShowSubtitle("Koniec sciezki", 5000);
             currentNode = null;
             currentNodeId = "";
@@ -290,24 +299,93 @@ namespace GTAVTrueCrimesMod
             if (index < 0 || index >= backgroundBehaviors.Count)
                 return "";
 
-            return backgroundBehaviors[index].DebugText;
+            return backgroundBehaviors[index].Behavior.DebugText;
         }
 
         internal void AddBackgroundBehavior(IMissionBackgroundBehavior behavior)
+        {
+            AddBackgroundBehavior(behavior, "mission");
+        }
+
+        internal void AddBackgroundBehavior(IMissionBackgroundBehavior behavior, string lifetime)
         {
             if (behavior == null)
                 return;
 
             for (int i = backgroundBehaviors.Count - 1; i >= 0; i--)
             {
-                if (backgroundBehaviors[i].Id == behavior.Id)
+                if (backgroundBehaviors[i].Behavior.Id == behavior.Id)
                 {
-                    backgroundBehaviors[i].Clear();
+                    backgroundBehaviors[i].Behavior.Clear();
                     backgroundBehaviors.RemoveAt(i);
                 }
             }
 
-            backgroundBehaviors.Add(behavior);
+            BackgroundBehaviorRegistration registration = new BackgroundBehaviorRegistration();
+            registration.Behavior = behavior;
+            registration.Lifetime = string.IsNullOrEmpty(lifetime) ? "mission" : lifetime.ToLowerInvariant();
+            registration.OwnerNodeId = registration.Lifetime == "node" ? currentNodeId : "";
+
+            backgroundBehaviors.Add(registration);
+        }
+
+        internal bool IsPlayerNearCurrentNodeTarget(float distance)
+        {
+            if (currentNode == null || currentNode.target == null)
+                return false;
+
+            float radius = Math.Max(0.1f, distance);
+
+            return Game.Player.Character.Position.DistanceTo(ToVector3(currentNode.target)) <= radius;
+        }
+
+        internal bool TryBeginScriptedKillByOther(string behaviorId, int shotCount, int shotGapMs, int damage)
+        {
+            if (string.IsNullOrEmpty(behaviorId))
+                return false;
+
+            for (int i = 0; i < backgroundBehaviors.Count; i++)
+            {
+                IMissionBackgroundBehavior behavior = backgroundBehaviors[i].Behavior;
+
+                if (behavior == null || behavior.Id != behaviorId)
+                    continue;
+
+                IScriptedMissionKillTarget target = behavior as IScriptedMissionKillTarget;
+
+                if (target == null)
+                    return false;
+
+                return target.BeginScriptedKillByOther(shotCount, shotGapMs, damage);
+            }
+
+            return false;
+        }
+
+        internal bool IsScriptedKillTargetNearCurrentNodeTarget(string behaviorId, float distance)
+        {
+            if (currentNode == null || currentNode.target == null || string.IsNullOrEmpty(behaviorId))
+                return false;
+
+            Vector3 targetPosition = ToVector3(currentNode.target);
+            float radius = Math.Max(0.1f, distance);
+
+            for (int i = 0; i < backgroundBehaviors.Count; i++)
+            {
+                IMissionBackgroundBehavior behavior = backgroundBehaviors[i].Behavior;
+
+                if (behavior == null || behavior.Id != behaviorId)
+                    continue;
+
+                IScriptedMissionKillTarget target = behavior as IScriptedMissionKillTarget;
+
+                if (target == null)
+                    return false;
+
+                return target.IsNearPosition(targetPosition, radius);
+            }
+
+            return false;
         }
 
         private void ApplyOnEnterEffects(MissionNode node)
@@ -315,9 +393,17 @@ namespace GTAVTrueCrimesMod
             if (node == null || node.onEnter == null)
                 return;
 
-            for (int i = 0; i < node.onEnter.Length; i++)
+            RunEffects(node.onEnter);
+        }
+
+        internal void RunEffects(MissionEffect[] effects)
+        {
+            if (effects == null)
+                return;
+
+            for (int i = 0; i < effects.Length; i++)
             {
-                MissionEffect effect = ResolveMissionEffect(node.onEnter[i]);
+                MissionEffect effect = ResolveMissionEffect(effects[i]);
 
                 for (int h = 0; h < effectHandlers.Count; h++)
                 {
@@ -348,7 +434,35 @@ namespace GTAVTrueCrimesMod
 
         internal void StartIncomingMissionCall(MissionNode node)
         {
+            phoneCallCompletesCurrentNode = true;
             ApplyPhoneCallEvents(phoneCall.StartRinging(node, Game.GameTime));
+        }
+
+        internal void StartSideMissionCall(MissionEffect effect)
+        {
+            if (effect == null)
+                return;
+
+            MissionNode node = new MissionNode();
+            node.type = "phone_call";
+            node.caller = effect.GetString("caller", "Nieznany numer");
+            node.text = effect.GetString("text", "");
+            node.audio = effect.GetString("audio", "");
+            node.subtitlesFile = effect.GetString("subtitlesFile", "");
+            node.subtitles = effect.subtitles;
+            node.audioSegments = effect.audioSegments;
+            node.completeAfterMs = effect.GetInt("completeAfterMs", 0);
+
+            phoneCallCompletesCurrentNode = effect.GetBool("completeCurrentNode", false);
+            ApplyPhoneCallEvents(phoneCall.StartRinging(node, Game.GameTime));
+        }
+
+        internal void SetFact(string fact, bool value)
+        {
+            if (string.IsNullOrEmpty(fact))
+                return;
+
+            facts[fact] = value;
         }
 
         public bool TryAnswerPhoneCall()
@@ -370,7 +484,9 @@ namespace GTAVTrueCrimesMod
         {
             StopNativeRingtone();
             StopPlayerPhoneAnimation();
+            StopMissionAudio();
             phoneCall.Reset();
+            phoneCallCompletesCurrentNode = false;
         }
 
         private void ApplyPhoneCallEvents(List<PhoneCallEvent> events)
@@ -424,7 +540,14 @@ namespace GTAVTrueCrimesMod
                 }
 
                 if (phoneEvent.type == PhoneCallEvent.Complete)
-                    CompleteCurrentNode();
+                {
+                    if (phoneCallCompletesCurrentNode)
+                        CompleteCurrentNode();
+                    else
+                        phoneCall.Reset();
+
+                    phoneCallCompletesCurrentNode = false;
+                }
             }
         }
 
@@ -535,16 +658,46 @@ namespace GTAVTrueCrimesMod
                 string path = Path.Combine(GetScriptsFolder(), "DetectiveAudio", file);
 
                 if (!File.Exists(path))
+                {
+                    GTA.UI.Screen.ShowSubtitle("Brak audio: " + file, 3500);
                     return;
+                }
 
-                if (activeCallPlayer != null)
-                    activeCallPlayer.Stop();
+                StopMissionAudio();
 
-                activeCallPlayer = new SoundPlayer(path);
+                byte[] audioBytes = File.ReadAllBytes(path);
+                activeCallAudioStream = new MemoryStream(audioBytes);
+                activeCallPlayer = new SoundPlayer(activeCallAudioStream);
+                activeCallPlayer.Load();
                 activeCallPlayer.Play();
+            }
+            catch (Exception ex)
+            {
+                GTA.UI.Screen.ShowSubtitle("Blad audio: " + ex.Message, 3500);
+            }
+        }
+
+        private void StopMissionAudio()
+        {
+            try
+            {
+                if (activeCallPlayer != null)
+                {
+                    activeCallPlayer.Stop();
+                    activeCallPlayer.Dispose();
+                    activeCallPlayer = null;
+                }
+
+                if (activeCallAudioStream != null)
+                {
+                    activeCallAudioStream.Dispose();
+                    activeCallAudioStream = null;
+                }
             }
             catch
             {
+                activeCallPlayer = null;
+                activeCallAudioStream = null;
             }
         }
 
@@ -561,9 +714,27 @@ namespace GTAVTrueCrimesMod
         private void ClearBackgroundBehaviors()
         {
             for (int i = 0; i < backgroundBehaviors.Count; i++)
-                backgroundBehaviors[i].Clear();
+                backgroundBehaviors[i].Behavior.Clear();
 
             backgroundBehaviors.Clear();
+        }
+
+        private void ClearBackgroundBehaviorsForNode(string nodeId)
+        {
+            if (string.IsNullOrEmpty(nodeId))
+                return;
+
+            for (int i = backgroundBehaviors.Count - 1; i >= 0; i--)
+            {
+                if (backgroundBehaviors[i].Lifetime != "node")
+                    continue;
+
+                if (backgroundBehaviors[i].OwnerNodeId != nodeId)
+                    continue;
+
+                backgroundBehaviors[i].Behavior.Clear();
+                backgroundBehaviors.RemoveAt(i);
+            }
         }
 
         internal void FailMission(string reason)
@@ -620,6 +791,13 @@ namespace GTAVTrueCrimesMod
                 return Game.Player.Character.Position;
 
             return new Vector3(pos.x, pos.y, pos.z);
+        }
+
+        private class BackgroundBehaviorRegistration
+        {
+            public IMissionBackgroundBehavior Behavior;
+            public string Lifetime;
+            public string OwnerNodeId;
         }
     }
 }

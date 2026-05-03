@@ -143,4 +143,30 @@ Use the generated sidecar instead of inline subtitles:
 }
 ```
 
-`subtitlesFile` is resolved relative to the mission JSON file. The mission deploy script copies JSON sidecars from `missions/` recursively.
+`subtitlesFile` is resolved relative to the mission JSON file. Runtime audio is
+loaded from `scripts/DetectiveAudio`, and `tools/deploy-missions.ps1` copies WAV
+files from local `audio/` into that game folder.
+
+For a call made from an effect hook, or any call that should chain multiple
+audio files, use `audioSegments`:
+
+```json
+{
+  "type": "phone_call",
+  "caller": "Morgan",
+  "audioSegments": [
+    {
+      "audio": "first_warning.wav",
+      "subtitlesFile": "subtitles/first_warning.subtitles.json",
+      "gapAfterMs": 250
+    },
+    {
+      "audio": "second_warning.wav",
+      "subtitlesFile": "subtitles/second_warning.subtitles.json"
+    }
+  ]
+}
+```
+
+The runtime starts the phone hold animation once, plays each segment in order,
+then hangs up after the final segment.

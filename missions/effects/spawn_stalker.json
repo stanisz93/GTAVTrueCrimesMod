@@ -33,12 +33,14 @@
     "_comment_attackDamage": "Extra scripted damage per tick. 0 means use only normal GTA knife combat damage.",
     "attackDamage": 0,
     "_comment_attackDamageIntervalMs": "How often extra scripted damage is applied when attackDamage is greater than 0.",
-    "attackDamageIntervalMs": 450
+    "attackDamageIntervalMs": 450,
+    "_comment_playerDamageMemoryMs": "How long recent player damage counts toward killed-by-player classification.",
+    "playerDamageMemoryMs": 5000
   },
   "configs": [
     {
       "id": "main_stalker",
-      "_comment": "Current mission stalker uses the default values. Add only changed keys here when this id needs overrides."
+      "_comment": "Current mission stalker uses the default behavior values. Story reactions belong in mission nodes."
     }
   ]
 }

@@ -15,7 +15,9 @@ namespace GTAVTrueCrimesMod.Tests
             TestSubtitlesWaitUntilPhoneIsAnswered();
             TestNodeCompletesAfterLastSubtitleEnds();
             TestCompleteAfterOverride();
+            TestPhoneAudioSegmentsRunSequentiallyBeforeHangup();
             TestMissionEffectConfigMergesDefaultsIdOverridesAndInlineArgs();
+            TestMissionEffectConfigKeepsInlineHookEffects();
             TestStalkerStartsAttackBeforePretending();
             TestStalkerAttackStopsOnlyForWitnesses();
             TestStalkerAttackDamageFlow();
@@ -109,6 +111,62 @@ namespace GTAVTrueCrimesMod.Tests
             AssertContains(phone.Tick(hangupEndAt), PhoneCallEvent.Complete, "completeAfterMs override completes after phone hangup");
         }
 
+        private static void TestPhoneAudioSegmentsRunSequentiallyBeforeHangup()
+        {
+            MissionNode node = new MissionNode
+            {
+                type = "phone_call",
+                caller = "Morgan",
+                audioSegments = new[]
+                {
+                    new MissionAudioSegment
+                    {
+                        audio = "first.wav",
+                        subtitles = new[]
+                        {
+                            new MissionSubtitleCue { atMs = 0, durationMs = 1000, text = "Pierwszy segment." }
+                        },
+                        gapAfterMs = 500
+                    },
+                    new MissionAudioSegment
+                    {
+                        audio = "second.wav",
+                        subtitles = new[]
+                        {
+                            new MissionSubtitleCue { atMs = 0, durationMs = 1200, text = "Drugi segment." }
+                        }
+                    }
+                }
+            };
+
+            MissionPhoneCallController phone = new MissionPhoneCallController();
+            phone.StartRinging(node, 0);
+
+            int answerAt = 1000;
+            int contentAt = answerAt + MissionPhoneCallController.AnswerAnimationDelayMs;
+            int secondStartAt = contentAt + 1000 + 500;
+            int finalAudioEndAt = secondStartAt + 1200;
+            int hangupEndAt = finalAudioEndAt + MissionPhoneCallController.HangupCleanupDelayMs;
+
+            phone.Answer(answerAt);
+
+            List<PhoneCallEvent> firstStart = phone.Tick(contentAt);
+            AssertContains(firstStart, PhoneCallEvent.StartCallHoldAnimation, "segmented call starts one hold animation");
+            AssertAudio(firstStart, "first.wav", "segmented call starts first audio");
+            AssertSubtitle(firstStart, "Pierwszy segment.", "segmented call starts first subtitle");
+
+            AssertNotContains(phone.Tick(secondStartAt - 1), PhoneCallEvent.EndCallAnimation, "segmented call keeps phone held between segments");
+
+            List<PhoneCallEvent> secondStart = phone.Tick(secondStartAt);
+            AssertNotContains(secondStart, PhoneCallEvent.StartCallHoldAnimation, "segmented call does not restart hold animation for second segment");
+            AssertAudio(secondStart, "second.wav", "segmented call starts second audio after first segment");
+            AssertSubtitle(secondStart, "Drugi segment.", "segmented call starts second subtitle");
+
+            AssertNotContains(phone.Tick(finalAudioEndAt - 1), PhoneCallEvent.EndCallAnimation, "segmented call does not hang up before final segment ends");
+            AssertContains(phone.Tick(finalAudioEndAt), PhoneCallEvent.EndCallAnimation, "segmented call hangs up after final segment");
+            AssertContains(phone.Tick(hangupEndAt), PhoneCallEvent.Complete, "segmented call completes after one final hangup");
+        }
+
         private static MissionNode CreatePhoneNode()
         {
             return new MissionNode
@@ -153,6 +211,62 @@ namespace GTAVTrueCrimesMod.Tests
             AssertEqual("12", resolved.GetFloat("followDistance", 0f).ToString("0"), "inline effect args win over config values");
             AssertEqual("false", resolved.GetBool("attackEnabled", true).ToString().ToLowerInvariant(), "id config can override default bools");
             AssertEqual("main_stalker", resolved.id, "resolved effect keeps inline id");
+
+            Directory.Delete(root, true);
+        }
+
+        private static void TestMissionEffectConfigKeepsInlineHookEffects()
+        {
+            string root = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "effect_hook_config_test");
+            string effectsDir = Path.Combine(root, "effects");
+
+            if (Directory.Exists(root))
+                Directory.Delete(root, true);
+
+            Directory.CreateDirectory(effectsDir);
+            File.WriteAllText(
+                Path.Combine(effectsDir, "spawn_stalker.json"),
+                "{ \"type\": \"spawn_stalker\", \"default\": { \"distanceBehindPlayer\": 40.0 }, \"configs\": [ { \"id\": \"main_stalker\" } ] }"
+            );
+
+            MissionEffect inline = new MissionEffect();
+            inline.type = "spawn_stalker";
+            inline.id = "main_stalker";
+            inline.args["type"] = inline.type;
+            inline.args["id"] = inline.id;
+            inline.args["lifetime"] = "node";
+            inline.onKilledByPlayer = new[]
+            {
+                new MissionEffect
+                {
+                    type = "set_fact",
+                    args = new Dictionary<string, string>
+                    {
+                        { "type", "set_fact" },
+                        { "fact", "stalker_killed_by_player" }
+                    }
+                },
+                new MissionEffect
+                {
+                    type = "phone_call",
+                    args = new Dictionary<string, string>
+                    {
+                        { "type", "phone_call" },
+                        { "caller", "Morgan" },
+                        { "text", "Done." }
+                    }
+                }
+            };
+
+            MissionEffectConfigLoader loader = new MissionEffectConfigLoader(root);
+            MissionEffect resolved = loader.Resolve(inline);
+
+            AssertEqual("40", resolved.GetFloat("distanceBehindPlayer", 0f).ToString("0"), "effect config still provides behavior defaults");
+            AssertEqual("node", resolved.GetString("lifetime", ""), "inline effect keeps node lifetime");
+            AssertEqual("2", resolved.onKilledByPlayer.Length.ToString(), "inline effect keeps onKilledByPlayer hook effects");
+            AssertEqual("set_fact", resolved.onKilledByPlayer[0].type, "first inline death hook is set_fact");
+            AssertEqual("stalker_killed_by_player", resolved.onKilledByPlayer[0].GetString("fact", ""), "set_fact hook keeps fact arg");
+            AssertEqual("phone_call", resolved.onKilledByPlayer[1].type, "second inline death hook is phone_call");
 
             Directory.Delete(root, true);
         }
@@ -339,6 +453,17 @@ namespace GTAVTrueCrimesMod.Tests
             }
 
             Fail(message + " | missing subtitle: " + text);
+        }
+
+        private static void AssertAudio(List<PhoneCallEvent> events, string audio, string message)
+        {
+            for (int i = 0; i < events.Count; i++)
+            {
+                if (events[i].type == PhoneCallEvent.PlayAudio && events[i].audio == audio)
+                    return;
+            }
+
+            Fail(message + " | missing audio: " + audio);
         }
 
         private static void AssertEqual(string expected, string actual, string message)

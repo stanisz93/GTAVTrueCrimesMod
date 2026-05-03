@@ -4,7 +4,10 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $missionsDir = Join-Path $repoRoot "missions"
 $effectsDir = Join-Path $missionsDir "effects"
 $knownEffectTypes = @(
-    "spawn_stalker"
+    "spawn_stalker",
+    "phone_call",
+    "set_fact",
+    "scripted_stalker_shot"
 )
 $knownNodeTypes = @(
     "objective",
@@ -162,6 +165,192 @@ function Test-SpawnStalkerSettings {
     Test-MinNumber $FileName $Scope $Settings "attackDamageIntervalMs" 100
     Test-NonNegativeNumber $FileName $Scope $Settings "maxWitnesses"
     Test-NonNegativeNumber $FileName $Scope $Settings "attackDamage"
+    Test-NonNegativeNumber $FileName $Scope $Settings "playerDamageMemoryMs"
+}
+
+function Test-ScriptedStalkerShotSettings {
+    param(
+        [string]$FileName,
+        [string]$Scope,
+        [object]$Settings
+    )
+
+    if ((Has-Property $Settings "targetBehaviorId") -and [string]::IsNullOrWhiteSpace($Settings.targetBehaviorId)) {
+        Add-Error $FileName "$Scope targetBehaviorId cannot be empty"
+    }
+
+    Test-PositiveNumber $FileName $Scope $Settings "triggerDistance"
+    Test-PositiveNumber $FileName $Scope $Settings "targetMaxDistanceFromNodeTarget"
+    Test-PositiveNumber $FileName $Scope $Settings "shotCount"
+    Test-PositiveNumber $FileName $Scope $Settings "damage"
+    Test-NonNegativeNumber $FileName $Scope $Settings "delayMs"
+    Test-NonNegativeNumber $FileName $Scope $Settings "shotGapMs"
+}
+
+function Test-PhoneCallFields {
+    param(
+        [string]$FileName,
+        [string]$Scope,
+        [object]$Call,
+        [string]$BaseDir
+    )
+
+    if (-not (Has-Property $Call "caller") -or [string]::IsNullOrWhiteSpace($Call.caller)) {
+        Add-Error $FileName "$Scope phone_call missing caller"
+    }
+
+    if ((Has-Property $Call "subtitles") -and $null -ne $Call.subtitles) {
+        Test-SubtitleCues $FileName $Scope @($Call.subtitles)
+    }
+
+    if ((Has-Property $Call "subtitlesFile") -and -not [string]::IsNullOrWhiteSpace($Call.subtitlesFile)) {
+        $subtitlePath = Join-Path $BaseDir $Call.subtitlesFile
+
+        if (-not (Test-Path -LiteralPath $subtitlePath)) {
+            Add-Error $FileName "$Scope subtitlesFile '$($Call.subtitlesFile)' does not exist"
+        }
+        else {
+            try {
+                $subtitleJson = Get-Content -LiteralPath $subtitlePath -Raw | ConvertFrom-Json
+                $subtitleCues = if ($subtitleJson -is [array]) { $subtitleJson } else { $subtitleJson.subtitles }
+
+                if ($null -eq $subtitleCues -or $subtitleCues.Count -eq 0) {
+                    Add-Error $FileName "$Scope subtitlesFile '$($Call.subtitlesFile)' has no subtitles"
+                }
+                else {
+                    Test-SubtitleCues $FileName $Scope @($subtitleCues)
+                }
+            }
+            catch {
+                Add-Error $FileName "$Scope invalid subtitlesFile '$($Call.subtitlesFile)': $($_.Exception.Message)"
+            }
+        }
+    }
+
+    if ((Has-Property $Call "audioSegments") -and $null -ne $Call.audioSegments) {
+        $index = 0
+
+        foreach ($segment in @($Call.audioSegments)) {
+            Test-AudioSegment $FileName "$Scope audioSegments[$index]" $segment $BaseDir
+            $index++
+        }
+    }
+}
+
+function Test-AudioSegment {
+    param(
+        [string]$FileName,
+        [string]$Scope,
+        [object]$Segment,
+        [string]$BaseDir
+    )
+
+    $hasAudio = (Has-Property $Segment "audio") -and -not [string]::IsNullOrWhiteSpace($Segment.audio)
+    $hasText = (Has-Property $Segment "text") -and -not [string]::IsNullOrWhiteSpace($Segment.text)
+    $hasSubtitles = (Has-Property $Segment "subtitles") -and $null -ne $Segment.subtitles
+    $hasSubtitlesFile = (Has-Property $Segment "subtitlesFile") -and -not [string]::IsNullOrWhiteSpace($Segment.subtitlesFile)
+    $hasDuration = (Has-Property $Segment "completeAfterMs") -and $Segment.completeAfterMs -gt 0
+
+    if (-not $hasAudio -and -not $hasText -and -not $hasSubtitles -and -not $hasSubtitlesFile -and -not $hasDuration) {
+        Add-Error $FileName "$Scope has no audio, text, subtitles, subtitlesFile, or completeAfterMs"
+    }
+
+    if ((Has-Property $Segment "completeAfterMs") -and $Segment.completeAfterMs -le 0) {
+        Add-Error $FileName "$Scope completeAfterMs must be positive"
+    }
+
+    if ((Has-Property $Segment "gapAfterMs") -and $Segment.gapAfterMs -lt 0) {
+        Add-Error $FileName "$Scope gapAfterMs cannot be negative"
+    }
+
+    if ($hasSubtitles) {
+        Test-SubtitleCues $FileName $Scope @($Segment.subtitles)
+    }
+
+    if ($hasSubtitlesFile) {
+        $subtitlePath = Join-Path $BaseDir $Segment.subtitlesFile
+
+        if (-not (Test-Path -LiteralPath $subtitlePath)) {
+            Add-Error $FileName "$Scope subtitlesFile '$($Segment.subtitlesFile)' does not exist"
+        }
+        else {
+            try {
+                $subtitleJson = Get-Content -LiteralPath $subtitlePath -Raw | ConvertFrom-Json
+                $subtitleCues = if ($subtitleJson -is [array]) { $subtitleJson } else { $subtitleJson.subtitles }
+
+                if ($null -eq $subtitleCues -or $subtitleCues.Count -eq 0) {
+                    Add-Error $FileName "$Scope subtitlesFile '$($Segment.subtitlesFile)' has no subtitles"
+                }
+                else {
+                    Test-SubtitleCues $FileName $Scope @($subtitleCues)
+                }
+            }
+            catch {
+                Add-Error $FileName "$Scope invalid subtitlesFile '$($Segment.subtitlesFile)': $($_.Exception.Message)"
+            }
+        }
+    }
+}
+
+function Test-EffectObject {
+    param(
+        [string]$FileName,
+        [string]$Scope,
+        [object]$Effect,
+        [string]$BaseDir,
+        [bool]$RequireType = $true
+    )
+
+    if (-not (Has-Property $Effect "type") -or [string]::IsNullOrWhiteSpace($Effect.type)) {
+        if ($RequireType) {
+            Add-Error $FileName "$Scope effect missing type"
+        }
+
+        $hookNamesWithoutType = @("onKilledByPlayer", "onKilledByOther")
+
+        foreach ($hookName in $hookNamesWithoutType) {
+            if (-not (Has-Property $Effect $hookName) -or $null -eq $Effect.$hookName) {
+                continue
+            }
+
+            foreach ($hookEffect in @($Effect.$hookName)) {
+                Test-EffectObject $FileName "$Scope $hookName" $hookEffect $BaseDir $true
+            }
+        }
+
+        return
+    }
+
+    if ($knownEffectTypes -notcontains $Effect.type) {
+        Add-Error $FileName "$Scope has unknown effect '$($Effect.type)'"
+    }
+
+    if ($Effect.type -eq "spawn_stalker") {
+        Test-SpawnStalkerSettings $FileName $Scope $Effect
+    }
+    elseif ($Effect.type -eq "phone_call") {
+        Test-PhoneCallFields $FileName $Scope $Effect $BaseDir
+    }
+    elseif ($Effect.type -eq "set_fact") {
+        if (-not (Has-Property $Effect "fact") -or [string]::IsNullOrWhiteSpace($Effect.fact)) {
+            Add-Error $FileName "$Scope set_fact missing fact"
+        }
+    }
+    elseif ($Effect.type -eq "scripted_stalker_shot") {
+        Test-ScriptedStalkerShotSettings $FileName $Scope $Effect
+    }
+
+    $hookNames = @("onKilledByPlayer", "onKilledByOther")
+
+    foreach ($hookName in $hookNames) {
+        if (-not (Has-Property $Effect $hookName) -or $null -eq $Effect.$hookName) {
+            continue
+        }
+
+        foreach ($hookEffect in @($Effect.$hookName)) {
+            Test-EffectObject $FileName "$Scope $hookName" $hookEffect $BaseDir $true
+        }
+    }
 }
 
 function Test-EffectConfigFile {
@@ -195,6 +384,7 @@ function Test-EffectConfigFile {
     }
     elseif ($config.type -eq "spawn_stalker") {
         Test-SpawnStalkerSettings $File.Name "default" $config.default
+        Test-EffectObject $File.Name "default" $config.default $missionsDir $false
     }
 
     if ((Has-Property $config "configs") -and $null -ne $config.configs) {
@@ -206,6 +396,7 @@ function Test-EffectConfigFile {
 
             if ($config.type -eq "spawn_stalker") {
                 Test-SpawnStalkerSettings $File.Name "override '$($entry.id)'" $entry
+                Test-EffectObject $File.Name "override '$($entry.id)'" $entry $missionsDir $false
             }
         }
     }
@@ -294,63 +485,12 @@ foreach ($file in $files) {
         }
 
         if ($node.type -eq "phone_call") {
-            if (-not (Has-Property $node "caller") -or [string]::IsNullOrWhiteSpace($node.caller)) {
-                Add-Error $file.Name "phone_call '$($node.id)' missing caller"
-            }
-
-            if ((Has-Property $node "subtitles") -and $null -ne $node.subtitles) {
-                Test-SubtitleCues $file.Name $node.id @($node.subtitles)
-            }
-
-            if ((Has-Property $node "subtitlesFile") -and -not [string]::IsNullOrWhiteSpace($node.subtitlesFile)) {
-                $subtitlePath = Join-Path $file.DirectoryName $node.subtitlesFile
-
-                if (-not (Test-Path -LiteralPath $subtitlePath)) {
-                    Add-Error $file.Name "phone_call '$($node.id)' subtitlesFile '$($node.subtitlesFile)' does not exist"
-                }
-                else {
-                    try {
-                        $subtitleJson = Get-Content -LiteralPath $subtitlePath -Raw | ConvertFrom-Json
-                        $subtitleCues = if ($subtitleJson -is [array]) { $subtitleJson } else { $subtitleJson.subtitles }
-
-                        if ($null -eq $subtitleCues -or $subtitleCues.Count -eq 0) {
-                            Add-Error $file.Name "phone_call '$($node.id)' subtitlesFile '$($node.subtitlesFile)' has no subtitles"
-                        }
-                        else {
-                            Test-SubtitleCues $file.Name $node.id @($subtitleCues)
-                        }
-                    }
-                    catch {
-                        Add-Error $file.Name "phone_call '$($node.id)' invalid subtitlesFile '$($node.subtitlesFile)': $($_.Exception.Message)"
-                    }
-                }
-            }
+            Test-PhoneCallFields $file.Name "phone_call '$($node.id)'" $node $file.DirectoryName
         }
 
         if ((Has-Property $node "onEnter") -and $null -ne $node.onEnter) {
             foreach ($effect in $node.onEnter) {
-                if (-not (Has-Property $effect "type") -or [string]::IsNullOrWhiteSpace($effect.type)) {
-                    Add-Error $file.Name "node '$($node.id)' onEnter effect missing type"
-                    continue
-                }
-
-                if ($knownEffectTypes -notcontains $effect.type) {
-                    Add-Error $file.Name "node '$($node.id)' has unknown onEnter effect '$($effect.type)'"
-                }
-
-                if ($effect.type -eq "spawn_stalker") {
-                    if ((Has-Property $effect "distanceBehindPlayer") -and $effect.distanceBehindPlayer -le 0) {
-                        Add-Error $file.Name "spawn_stalker in node '$($node.id)' distanceBehindPlayer must be positive"
-                    }
-
-                    if ((Has-Property $effect "followRepathMs") -and $effect.followRepathMs -lt 250) {
-                        Add-Error $file.Name "spawn_stalker in node '$($node.id)' followRepathMs should be >= 250"
-                    }
-
-                    if ((Has-Property $effect "attackDamage") -and $effect.attackDamage -lt 0) {
-                        Add-Error $file.Name "spawn_stalker in node '$($node.id)' attackDamage cannot be negative"
-                    }
-                }
+                Test-EffectObject $file.Name "node '$($node.id)' onEnter" $effect $file.DirectoryName $true
             }
         }
     }

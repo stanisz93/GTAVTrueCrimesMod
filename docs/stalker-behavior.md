@@ -1,8 +1,7 @@
 # Stalker Behavior
 
-This document describes the current `spawn_stalker` effect, its config file,
-runtime behavior, and the intended extension path for event hooks such as
-`onKilledByPlayer`.
+This document describes the current `spawn_stalker` effect, its behavior config,
+runtime behavior, and event hooks such as `onKilledByPlayer`.
 
 ## Files
 
@@ -22,13 +21,18 @@ A mission node starts the stalker through an `onEnter` effect:
 "onEnter": [
   {
     "type": "spawn_stalker",
-    "id": "main_stalker"
+    "id": "main_stalker",
+    "lifetime": "node"
   }
 ]
 ```
 
 The node does not need to list all stalker tuning values. The runtime loads
 them from `missions/effects/spawn_stalker.json`.
+
+Story-specific consequences, such as facts and phone calls after the stalker
+dies, should live in the mission node. The shared `spawn_stalker` config should
+stay focused on reusable movement, detection, and combat settings.
 
 ## Config Layout
 
@@ -215,6 +219,7 @@ F11 still shows the current mission node and active facts.
 - root mission JSON files
 - `missions/subtitles/*.json`
 - `missions/effects/*.json`
+- local `audio/*.wav` files into `scripts/DetectiveAudio`
 
 Files ending with `.node-snippet.json` are skipped.
 
@@ -234,9 +239,17 @@ Run:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\validate-missions.ps1
 ```
 
-## Next Step: Event Hooks
+## Event Hooks
 
-The next planned direction is to let a stalker effect react to its own events:
+The stalker effect can react to its own events through nested effect arrays.
+Current supported death hooks are:
+
+- `onKilledByPlayer`
+- `onKilledByOther`
+
+These hooks should live inline in the mission node, because they are
+story-specific reactions. Keep `missions/effects/spawn_stalker.json` focused on
+reusable stalker behavior tuning.
 
 ```json
 {
@@ -245,27 +258,94 @@ The next planned direction is to let a stalker effect react to its own events:
   "lifetime": "node",
   "onKilledByPlayer": [
     {
+      "type": "set_fact",
+      "fact": "stalker_killed_by_player"
+    },
+    {
       "type": "phone_call",
       "caller": "Morgan",
-      "audio": "stalker_killed_by_player.wav",
-      "subtitlesFile": "subtitles/stalker_killed_by_player.json"
+      "audioSegments": [
+        {
+          "audio": "player_killed_stalker_first.wav",
+          "subtitlesFile": "subtitles/player_killed_stalker_first.subtitles.json"
+        }
+      ]
     }
   ],
   "onKilledByOther": [
     {
+      "type": "set_fact",
+      "fact": "stalker_killed_by_other"
+    },
+    {
       "type": "phone_call",
       "caller": "Morgan",
-      "audio": "stalker_killed_by_other.wav",
-      "subtitlesFile": "subtitles/stalker_killed_by_other.json"
+      "text": "Ktos zdjal tego, ktory cie sledzil. Nie zakladaj, ze to dobra wiadomosc.",
+      "completeAfterMs": 7000
     }
   ]
 }
 ```
 
-This is not implemented yet. The likely implementation is:
+Hook effects are normal effects. Current supported hook effects are:
 
-- keep `spawn_stalker` as an effect, not a node
-- add side-effect phone calls that do not complete the current node
-- let `StalkerBehavior` detect death and ask `MissionRuntime` to run hook effects
-- support `lifetime: "node"` so the stalker can be cleaned up when the owning node ends
+- `set_fact`
+- `phone_call`
 
+Important: hook phone calls are side-effect calls. They ring, can be answered,
+play subtitles/audio, and hang up, but they do not complete the current mission
+node.
+
+Set `"completeCurrentNode": true` on a hook `phone_call` when the current node
+should advance after that call finishes. This is useful for scenes where the
+stalker death, not arrival at the marker, is the real node completion beat.
+
+Phone calls may use either the legacy single `audio`/`subtitlesFile` fields or
+`audioSegments`. Segments run sequentially under one call, so the player keeps
+holding the phone until the last segment finishes.
+
+Killed-by-player detection uses two signals:
+
+- `Ped.Killer` when GTA records the killer entity
+- recent player damage memory via `playerDamageMemoryMs`
+
+This means a stalker can still count as killed by the player if the player
+damaged him shortly before the final GTA physics/combat event.
+
+## Lifetime
+
+`lifetime` controls how long the spawned stalker background behavior exists.
+
+- `mission` keeps it until mission end/failure/retry.
+- `node` removes it when the owning node ends or changes.
+
+The current mission uses node-scoped lifetime in `silence_after_midnight.json`:
+
+```json
+"lifetime": "node"
+```
+
+## Scripted Rescue Shot
+
+`scripted_stalker_shot` is a node-scoped background effect that waits until the
+player is near the current node target, then starts a scripted gunshot kill on a
+target stalker behavior.
+
+```json
+{
+  "type": "scripted_stalker_shot",
+  "id": "scene_arrival_stalker_shot",
+  "targetBehaviorId": "main_stalker",
+  "triggerDistance": 8.0,
+  "requireTargetNearNodeTarget": true,
+  "targetMaxDistanceFromNodeTarget": 12.0,
+  "delayMs": 700,
+  "shotCount": 2,
+  "shotGapMs": 250,
+  "damage": 500
+}
+```
+
+With `requireTargetNearNodeTarget`, the shot waits until both the player and the
+stalker are close enough to the current node target. The shot marks the death as
+`onKilledByOther`, so the stalker's normal death hooks decide what happens next.
