@@ -16,6 +16,7 @@ namespace GTAVTrueCrimesMod.Tests
             TestNodeCompletesAfterLastSubtitleEnds();
             TestCompleteAfterOverride();
             TestPhoneAudioSegmentsRunSequentiallyBeforeHangup();
+            TestInteractionAudioSequenceRunsWithoutPhoneEvents();
             TestMissionEffectConfigMergesDefaultsIdOverridesAndInlineArgs();
             TestMissionEffectConfigKeepsInlineHookEffects();
             TestStalkerStartsAttackBeforePretending();
@@ -181,6 +182,35 @@ namespace GTAVTrueCrimesMod.Tests
                     new MissionSubtitleCue { atMs = 1700, durationMs = 1100, text = "Druga linia." }
                 }
             };
+        }
+
+        private static void TestInteractionAudioSequenceRunsWithoutPhoneEvents()
+        {
+            MissionAudioSequenceController sequence = new MissionAudioSequenceController();
+            MissionAudioSegment[] segments = new[]
+            {
+                new MissionAudioSegment
+                {
+                    audio = "inner_voice.wav",
+                    subtitles = new[]
+                    {
+                        new MissionSubtitleCue { atMs = 0, durationMs = 1500, text = "Wewnetrzny dialog." }
+                    }
+                }
+            };
+
+            sequence.Start(segments, 1000, 1800);
+
+            AssertNotContains(sequence.Tick(2799), PhoneCallEvent.PlayAudio, "interaction audio waits for configured start delay");
+
+            List<PhoneCallEvent> started = sequence.Tick(2800);
+            AssertAudio(started, "inner_voice.wav", "interaction audio starts without phone pickup");
+            AssertSubtitle(started, "Wewnetrzny dialog.", "interaction audio shows subtitle cue");
+            AssertNotContains(started, PhoneCallEvent.BeginCallAnimation, "interaction audio does not start phone pickup animation");
+            AssertNotContains(started, PhoneCallEvent.StartCallHoldAnimation, "interaction audio does not start phone hold animation");
+
+            AssertNotContains(sequence.Tick(4299), PhoneCallEvent.Complete, "interaction audio waits until last cue ends");
+            AssertContains(sequence.Tick(4300), PhoneCallEvent.Complete, "interaction audio completes after last cue ends");
         }
 
         private static void TestMissionEffectConfigMergesDefaultsIdOverridesAndInlineArgs()

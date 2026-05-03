@@ -7,7 +7,7 @@ using System;
 
 namespace GTAVTrueCrimesMod.Behaviors
 {
-    public class StalkerBehavior : IMissionBackgroundBehavior, IScriptedMissionKillTarget
+    public class StalkerBehavior : IMissionBackgroundBehavior, IScriptedMissionKillTarget, INodeTransitionBackgroundBehavior
     {
         private static readonly string[] PretendPhoneSpeechLines = new[]
         {
@@ -41,6 +41,7 @@ namespace GTAVTrueCrimesMod.Behaviors
         private readonly int attackDamage;
         private readonly int attackDamageIntervalMs;
         private readonly int playerDamageMemoryMs;
+        private readonly bool preserveDeadBodyOnNodeExit;
         private readonly MissionEffect[] onKilledByPlayer;
         private readonly MissionEffect[] onKilledByOther;
         private readonly StalkerDecisionConfig decisionConfig;
@@ -57,6 +58,8 @@ namespace GTAVTrueCrimesMod.Behaviors
         private int scriptedKillShotsRemaining;
         private int scriptedKillShotGapMs;
         private int scriptedKillDamage;
+        private Ped scriptedShooter;
+        private int scriptedShooterCleanupAt;
         private string state = "not_spawned";
         private int pretendMode;
         private int pretendUntil;
@@ -103,6 +106,7 @@ namespace GTAVTrueCrimesMod.Behaviors
             attackDamage = config == null ? 0 : Math.Max(0, config.GetInt("attackDamage", 0));
             attackDamageIntervalMs = config == null ? 450 : Math.Max(100, config.GetInt("attackDamageIntervalMs", 450));
             playerDamageMemoryMs = config == null ? 5000 : Math.Max(0, config.GetInt("playerDamageMemoryMs", 5000));
+            preserveDeadBodyOnNodeExit = config != null && config.GetBool("preserveDeadBodyOnNodeExit", false);
             onKilledByPlayer = config == null || config.onKilledByPlayer == null ? new MissionEffect[0] : config.onKilledByPlayer;
             onKilledByOther = config == null || config.onKilledByOther == null ? new MissionEffect[0] : config.onKilledByOther;
             decisionConfig = CreateDecisionConfig();
@@ -139,6 +143,7 @@ namespace GTAVTrueCrimesMod.Behaviors
             if (!EnsureStalkerExists())
                 return;
 
+            TickScriptedShooterCleanup();
             TrackPlayerDamage();
 
             if (HandleStalkerDeath(runtime))
@@ -309,6 +314,49 @@ namespace GTAVTrueCrimesMod.Behaviors
                 stalker = null;
             }
 
+            ResetBehaviorStateAfterClear();
+        }
+
+        public void ClearForNodeTransition(MissionRuntime runtime)
+        {
+            StopPretendPhoneCall();
+            ClearScriptedShooter();
+
+            if (ShouldPreserveDeadBodyOnNodeExit())
+            {
+                try
+                {
+                    stalker.IsPersistent = true;
+                    stalker.BlockPermanentEvents = true;
+                }
+                catch
+                {
+                }
+
+                if (runtime != null)
+                    runtime.PreserveEntityForMissionCleanup(stalker);
+
+                stalker = null;
+                ResetBehaviorStateAfterClear();
+                return;
+            }
+
+            Clear();
+        }
+
+        private bool ShouldPreserveDeadBodyOnNodeExit()
+        {
+            if (!preserveDeadBodyOnNodeExit)
+                return false;
+
+            if (stalker == null || !stalker.Exists())
+                return false;
+
+            return stalker.IsDead || stalker.Health <= 0;
+        }
+
+        private void ResetBehaviorStateAfterClear()
+        {
             pretending = false;
             attacking = false;
             deathHandled = false;
@@ -319,6 +367,7 @@ namespace GTAVTrueCrimesMod.Behaviors
             scriptedKillShotsRemaining = 0;
             scriptedKillShotGapMs = 0;
             scriptedKillDamage = 0;
+            ClearScriptedShooter();
             state = "cleared";
             lastMovementState = "cleared";
             pretendMode = 0;
@@ -373,6 +422,7 @@ namespace GTAVTrueCrimesMod.Behaviors
             scriptedKillShotsRemaining = 0;
             scriptedKillShotGapMs = 0;
             scriptedKillDamage = 0;
+            ClearScriptedShooter();
             state = "spawned";
             lastMovementState = "spawned";
             nextDamageAt = 0;
@@ -552,6 +602,8 @@ namespace GTAVTrueCrimesMod.Behaviors
                 Vector3 target = stalker.Position + new Vector3(0f, 0f, 1.05f);
                 Vector3 source = GetScriptedShotSource(target);
 
+                FireScriptedShooterShot(source);
+
                 Function.Call(
                     Hash.SHOOT_SINGLE_BULLET_BETWEEN_COORDS,
                     source.X,
@@ -572,6 +624,92 @@ namespace GTAVTrueCrimesMod.Behaviors
             catch
             {
             }
+        }
+
+        private void FireScriptedShooterShot(Vector3 source)
+        {
+            try
+            {
+                Ped shooter = EnsureScriptedShooter(source);
+
+                if (shooter == null || !shooter.Exists())
+                    return;
+
+                shooter.Position = source;
+                shooter.Weapons.Give(WeaponHash.Pistol, 12, true, true);
+
+                Function.Call(
+                    Hash.TASK_SHOOT_AT_ENTITY,
+                    shooter.Handle,
+                    stalker.Handle,
+                    Math.Max(350, scriptedKillShotGapMs + 250),
+                    unchecked((int)0x5D60E4E0)
+                );
+
+                scriptedShooterCleanupAt = Game.GameTime + 2500;
+            }
+            catch
+            {
+            }
+        }
+
+        private Ped EnsureScriptedShooter(Vector3 source)
+        {
+            if (scriptedShooter != null && scriptedShooter.Exists())
+                return scriptedShooter;
+
+            Model model = new Model(PedHash.Business01AMM);
+            model.Request(500);
+
+            scriptedShooter = World.CreatePed(model, source);
+            model.MarkAsNoLongerNeeded();
+
+            if (scriptedShooter == null || !scriptedShooter.Exists())
+                return null;
+
+            scriptedShooter.IsPersistent = true;
+            scriptedShooter.BlockPermanentEvents = true;
+            scriptedShooter.KeepTaskWhenMarkedAsNoLongerNeeded = true;
+
+            try
+            {
+                Function.Call(Hash.SET_ENTITY_VISIBLE, scriptedShooter.Handle, false, false);
+                Function.Call(Hash.SET_ENTITY_COLLISION, scriptedShooter.Handle, false, false);
+                Function.Call(Hash.FREEZE_ENTITY_POSITION, scriptedShooter.Handle, true);
+                Function.Call(Hash.SET_ENTITY_INVINCIBLE, scriptedShooter.Handle, true);
+            }
+            catch
+            {
+            }
+
+            return scriptedShooter;
+        }
+
+        private void TickScriptedShooterCleanup()
+        {
+            if (scriptedShooterCleanupAt <= 0 || Game.GameTime < scriptedShooterCleanupAt)
+                return;
+
+            ClearScriptedShooter();
+        }
+
+        private void ClearScriptedShooter()
+        {
+            scriptedShooterCleanupAt = 0;
+
+            if (scriptedShooter == null)
+                return;
+
+            try
+            {
+                if (scriptedShooter.Exists())
+                    scriptedShooter.Delete();
+            }
+            catch
+            {
+            }
+
+            scriptedShooter = null;
         }
 
         private Vector3 GetScriptedShotSource(Vector3 target)

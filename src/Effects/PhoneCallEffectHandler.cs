@@ -11,6 +11,14 @@ namespace GTAVTrueCrimesMod.Effects
 
         public void Apply(MissionRuntime runtime, MissionEffect effect)
         {
+            int delayMs = effect.GetInt("delayMs", 0);
+
+            if (delayMs > 0)
+            {
+                runtime.ScheduleSideMissionCall(effect, delayMs);
+                return;
+            }
+
             runtime.StartSideMissionCall(effect);
         }
     }

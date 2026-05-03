@@ -16,6 +16,10 @@ $knownNodeTypes = @(
     "ending",
     "phone_call"
 )
+$knownCompleteWhens = @(
+    "playerNearTarget",
+    "interactWithPreservedBody"
+)
 $errors = New-Object System.Collections.Generic.List[string]
 
 function Add-Error {
@@ -330,6 +334,7 @@ function Test-EffectObject {
     }
     elseif ($Effect.type -eq "phone_call") {
         Test-PhoneCallFields $FileName $Scope $Effect $BaseDir
+        Test-NonNegativeNumber $FileName $Scope $Effect "delayMs"
     }
     elseif ($Effect.type -eq "set_fact") {
         if (-not (Has-Property $Effect "fact") -or [string]::IsNullOrWhiteSpace($Effect.fact)) {
@@ -478,14 +483,39 @@ foreach ($file in $files) {
             }
         }
 
-        if ((Has-Property $node "completeWhen") -and $node.completeWhen -eq "playerNearTarget") {
-            if (-not (Has-Property $node "target") -or $null -eq $node.target) {
-                Add-Error $file.Name "node '$($node.id)' completeWhen=playerNearTarget requires target"
+        Test-PositiveNumber $file.Name "node '$($node.id)'" $node "instructionClearDistance"
+
+        if ((Has-Property $node "completeWhen") -and -not [string]::IsNullOrWhiteSpace($node.completeWhen)) {
+            if ($knownCompleteWhens -notcontains $node.completeWhen) {
+                Add-Error $file.Name "node '$($node.id)' has unknown completeWhen '$($node.completeWhen)'"
+            }
+
+            if ($node.completeWhen -eq "playerNearTarget") {
+                if (-not (Has-Property $node "target") -or $null -eq $node.target) {
+                    Add-Error $file.Name "node '$($node.id)' completeWhen=playerNearTarget requires target"
+                }
+            }
+
+            if ($node.completeWhen -eq "interactWithPreservedBody") {
+                Test-PositiveNumber $file.Name "node '$($node.id)'" $node "interactionDistance"
+                Test-PositiveNumber $file.Name "node '$($node.id)'" $node "interactionAnimationDurationMs"
+                Test-NonNegativeNumber $file.Name "node '$($node.id)'" $node "interactionAudioStartDelayMs"
+                Test-NonNegativeNumber $file.Name "node '$($node.id)'" $node "interactionCompleteDelayMs"
+
+                if ((Has-Property $node "interactionAudioSegments") -and $null -ne $node.interactionAudioSegments) {
+                    $index = 0
+
+                    foreach ($segment in @($node.interactionAudioSegments)) {
+                        Test-AudioSegment $file.Name "node '$($node.id)' interactionAudioSegments[$index]" $segment $file.DirectoryName
+                        $index++
+                    }
+                }
             }
         }
 
         if ($node.type -eq "phone_call") {
             Test-PhoneCallFields $file.Name "phone_call '$($node.id)'" $node $file.DirectoryName
+            Test-NonNegativeNumber $file.Name "phone_call '$($node.id)'" $node "delayMs"
         }
 
         if ((Has-Property $node "onEnter") -and $null -ne $node.onEnter) {

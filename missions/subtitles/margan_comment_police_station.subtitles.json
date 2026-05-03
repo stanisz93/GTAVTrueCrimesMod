@@ -1,0 +1,35 @@
+﻿{
+    "audio":  "margan_comment_police_station.wav",
+    "sourceText":  "inline",
+    "chunkDelimiter":  "|",
+    "subtitleOffsetMs":  300,
+    "postprocessing":  {
+                           "enabled":  true,
+                           "onlyPostprocessing":  false,
+                           "outputSuffix":  "_phone",
+                           "telephone":  true,
+                           "noise":  0.012,
+                           "noiseProfile":  "phone",
+                           "hum":  0.0015,
+                           "pan":  -0.25,
+                           "volume":  1.08
+                       },
+    "generatedAtUtc":  "2026-05-03T10:11:42.9326174Z",
+    "subtitles":  [
+                      {
+                          "atMs":  300,
+                          "endMs":  3237,
+                          "text":  "A police station ... That should make me feel better..."
+                      },
+                      {
+                          "atMs":  3829,
+                          "endMs":  5989,
+                          "text":  "It doesn’t! If someone sent him there"
+                      },
+                      {
+                          "atMs":  6070,
+                          "endMs":  10563,
+                          "text":  "then either he was going to confess, or someone inside was waiting for him!"
+                      }
+                  ]
+}

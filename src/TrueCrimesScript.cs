@@ -83,6 +83,12 @@ namespace GTAVTrueCrimesMod
                 return;
             }
 
+            if (e.KeyCode == Keys.E)
+            {
+                if (missionRuntime.TryInteractWithCurrentNode())
+                    return;
+            }
+
             if (e.KeyCode == Keys.F8)
             {
                 missionRuntime.CompleteCurrentNode();
@@ -170,9 +176,11 @@ namespace GTAVTrueCrimesMod
 
             if (missionRuntime.ActiveMission != null)
             {
-                DrawActiveMissionInfo();
                 missionRuntime.UpdateBackgroundBehaviors();
                 missionRuntime.TickCurrentNode();
+                DrawActiveMissionInfo();
+                DrawNodeInstruction();
+                DrawInteractionPrompt();
                 DrawBackgroundDebugInfo();
             }
 
@@ -211,6 +219,26 @@ namespace GTAVTrueCrimesMod
 
             if (!string.IsNullOrEmpty(missionRuntime.CurrentNodeId))
                 DrawText("Node: " + missionRuntime.CurrentNodeId, 0.70f, 0.115f, 0.28f);
+        }
+
+        private void DrawInteractionPrompt()
+        {
+            string prompt = missionRuntime.CurrentInteractionPrompt;
+
+            if (string.IsNullOrEmpty(prompt))
+                return;
+
+            DrawTextColored(prompt, 0.42f, 0.82f, 0.38f, 255, 230, 80, 255);
+        }
+
+        private void DrawNodeInstruction()
+        {
+            string instruction = missionRuntime.CurrentNodeInstructionText;
+
+            if (string.IsNullOrEmpty(instruction))
+                return;
+
+            DrawWrappedTextColored(instruction, 0.35f, 0.74f, 0.34f, 255, 220, 40, 255, 62);
         }
 
         private void DrawMissionFailed()
@@ -279,6 +307,40 @@ namespace GTAVTrueCrimesMod
             Function.Call(Hash.BEGIN_TEXT_COMMAND_DISPLAY_TEXT, "STRING");
             Function.Call(Hash.ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME, text);
             Function.Call(Hash.END_TEXT_COMMAND_DISPLAY_TEXT, x, y);
+        }
+
+        private void DrawWrappedTextColored(string text, float x, float y, float scale, int red, int green, int blue, int alpha, int maxLineLength)
+        {
+            if (string.IsNullOrEmpty(text))
+                return;
+
+            string remaining = text;
+            int line = 0;
+
+            while (!string.IsNullOrEmpty(remaining) && line < 3)
+            {
+                string current = TakeWrappedLine(remaining, maxLineLength);
+                DrawTextColored(current, x, y + line * 0.028f, scale, red, green, blue, alpha);
+
+                if (current.Length >= remaining.Length)
+                    break;
+
+                remaining = remaining.Substring(current.Length).TrimStart();
+                line++;
+            }
+        }
+
+        private string TakeWrappedLine(string text, int maxLineLength)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length <= maxLineLength)
+                return text;
+
+            int breakAt = text.LastIndexOf(' ', Math.Min(maxLineLength, text.Length - 1));
+
+            if (breakAt <= 0)
+                breakAt = maxLineLength;
+
+            return text.Substring(0, breakAt).TrimEnd();
         }
     }
 }

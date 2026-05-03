@@ -120,7 +120,17 @@ namespace GTAVTrueCrimesMod
                     node.id = ReadJsonString(nodeJson, "id");
                     node.type = ReadJsonString(nodeJson, "type");
                     node.text = ReadJsonString(nodeJson, "text");
+                    node.instructionClearDistance = ReadJsonFloat(nodeJson, "instructionClearDistance", 0f);
                     node.completeWhen = ReadJsonString(nodeJson, "completeWhen");
+                    node.interactionText = ReadJsonString(nodeJson, "interactionText");
+                    node.interactionResultText = ReadJsonString(nodeJson, "interactionResultText");
+                    node.interactionAudioSegments = ReadAudioSegments(nodeJson, missionFolder, "interactionAudioSegments");
+                    node.interactionDistance = ReadJsonFloat(nodeJson, "interactionDistance", 0f);
+                    node.interactionAnimationDict = ReadJsonString(nodeJson, "interactionAnimationDict");
+                    node.interactionAnimationName = ReadJsonString(nodeJson, "interactionAnimationName");
+                    node.interactionAnimationDurationMs = ReadJsonInt(nodeJson, "interactionAnimationDurationMs", 0);
+                    node.interactionAudioStartDelayMs = ReadJsonInt(nodeJson, "interactionAudioStartDelayMs", 0);
+                    node.interactionCompleteDelayMs = ReadJsonInt(nodeJson, "interactionCompleteDelayMs", 0);
                     node.setFact = ReadJsonString(nodeJson, "setFact");
                     node.next = ReadJsonString(nodeJson, "next");
                     node.caller = ReadJsonString(nodeJson, "caller");
@@ -132,6 +142,7 @@ namespace GTAVTrueCrimesMod
                         node.subtitles = ReadSubtitleCuesFile(missionFolder, node.subtitlesFile);
 
                     node.audioSegments = ReadAudioSegments(nodeJson, missionFolder);
+                    node.delayMs = ReadJsonInt(nodeJson, "delayMs", 0);
                     node.completeAfterMs = ReadJsonInt(nodeJson, "completeAfterMs", 0);
                     node.onEnter = ReadMissionEffects(nodeJson, "onEnter", missionFolder);
 
@@ -290,9 +301,14 @@ namespace GTAVTrueCrimesMod
 
         private MissionAudioSegment[] ReadAudioSegments(string json, string missionFolder)
         {
+            return ReadAudioSegments(json, missionFolder, "audioSegments");
+        }
+
+        private MissionAudioSegment[] ReadAudioSegments(string json, string missionFolder, string key)
+        {
             try
             {
-                string segmentsJson = ReadJsonArray(json, "audioSegments");
+                string segmentsJson = ReadJsonArray(json, key);
 
                 if (string.IsNullOrEmpty(segmentsJson))
                     return new MissionAudioSegment[0];

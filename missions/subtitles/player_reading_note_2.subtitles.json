@@ -1,0 +1,40 @@
+﻿{
+    "audio":  "player_reading_note_2.wav",
+    "sourceText":  "inline",
+    "chunkDelimiter":  "|",
+    "subtitleOffsetMs":  300,
+    "postprocessing":  {
+                           "enabled":  true,
+                           "onlyPostprocessing":  false,
+                           "outputSuffix":  "_phone",
+                           "telephone":  false,
+                           "noise":  0,
+                           "noiseProfile":  "phone",
+                           "hum":  0.0015,
+                           "pan":  -0.25,
+                           "volume":  1.08
+                       },
+    "generatedAtUtc":  "2026-05-03T09:30:14.9130679Z",
+    "subtitles":  [
+                      {
+                          "atMs":  300,
+                          "endMs":  1949,
+                          "text":  "No name. No signature."
+                      },
+                      {
+                          "atMs":  2367,
+                          "endMs":  4758,
+                          "text":  "Just a time... and a police station."
+                      },
+                      {
+                          "atMs":  5420,
+                          "endMs":  9472,
+                          "text":  "What?! A police station??? That’s not good."
+                      },
+                      {
+                          "atMs":  10134,
+                          "endMs":  14000,
+                          "text":  "If he was meeting a cop... then I don’t know who I’m supposed to trust anymore."
+                      }
+                  ]
+}

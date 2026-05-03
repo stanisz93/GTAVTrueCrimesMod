@@ -1,0 +1,35 @@
+﻿{
+    "audio":  "player_reading_note.wav",
+    "sourceText":  "inline",
+    "chunkDelimiter":  "|",
+    "subtitleOffsetMs":  300,
+    "postprocessing":  {
+                           "enabled":  false,
+                           "onlyPostprocessing":  false,
+                           "outputSuffix":  "_phone",
+                           "telephone":  true,
+                           "noise":  0.012,
+                           "noiseProfile":  "phone",
+                           "hum":  0.0015,
+                           "pan":  -0.25,
+                           "volume":  1.08
+                       },
+    "generatedAtUtc":  "2026-05-03T09:03:04.5155804Z",
+    "subtitles":  [
+                      {
+                          "atMs":  300,
+                          "endMs":  1925,
+                          "text":  "No name. No signature."
+                      },
+                      {
+                          "atMs":  2285,
+                          "endMs":  4201,
+                          "text":  "Just a time... and a café."
+                      },
+                      {
+                          "atMs":  4863,
+                          "endMs":  6569,
+                          "text":  "I think I know where it might be..."
+                      }
+                  ]
+}

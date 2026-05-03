@@ -256,6 +256,7 @@ reusable stalker behavior tuning.
   "type": "spawn_stalker",
   "id": "main_stalker",
   "lifetime": "node",
+  "preserveDeadBodyOnNodeExit": true,
   "onKilledByPlayer": [
     {
       "type": "set_fact",
@@ -319,6 +320,47 @@ damaged him shortly before the final GTA physics/combat event.
 - `mission` keeps it until mission end/failure/retry.
 - `node` removes it when the owning node ends or changes.
 
+When a node-scoped stalker becomes the subject of the next node, set
+`preserveDeadBodyOnNodeExit` to `true`. The behavior stops running on node
+transition, but a dead stalker body remains in the world for follow-up nodes
+such as `inspect_body`. The runtime still tracks that preserved body and removes
+it on mission restart/failure.
+
+Follow-up nodes can require an explicit body interaction instead of completing
+automatically:
+
+```json
+{
+  "id": "inspect_body",
+  "type": "clue",
+  "text": "Podejdz do ciala i przeszukaj je.",
+  "completeWhen": "interactWithPreservedBody",
+  "interactionText": "Przeszukaj cialo",
+  "interactionDistance": 2.5,
+  "interactionAnimationDict": "pickup_object",
+  "interactionAnimationName": "pickup_low",
+  "interactionAnimationDurationMs": 1800,
+  "interactionResultText": "Znajdujesz zlozona notatke w jego kurtce i zaczynasz czytac...",
+  "interactionAudioStartDelayMs": 1800,
+  "interactionAudioSegments": [
+    {
+      "audio": "inspect_body_inner_voice.wav",
+      "subtitlesFile": "subtitles/inspect_body_inner_voice.subtitles.json"
+    }
+  ],
+  "interactionCompleteDelayMs": 5500,
+  "next": "check_security"
+}
+```
+
+When the player is close enough to the preserved dead ped, the HUD shows
+`E - interactionText`. Pressing `E` first plays the configured pickup/search
+animation. After `interactionAnimationDurationMs`, it shows
+`interactionResultText`, waits for `interactionAudioStartDelayMs`, then plays
+`interactionAudioSegments` without phone ringing or phone animations. The node
+completes after the last interaction audio segment ends. If there are no
+interaction audio segments, it falls back to `interactionCompleteDelayMs`.
+
 The current mission uses node-scoped lifetime in `silence_after_midnight.json`:
 
 ```json
@@ -349,3 +391,6 @@ target stalker behavior.
 With `requireTargetNearNodeTarget`, the shot waits until both the player and the
 stalker are close enough to the current node target. The shot marks the death as
 `onKilledByOther`, so the stalker's normal death hooks decide what happens next.
+The runtime also spawns a short-lived invisible shooter at the side of the scene
+to produce a natural pistol shot sound; the stalker death is still guaranteed by
+the scripted kill fallback.

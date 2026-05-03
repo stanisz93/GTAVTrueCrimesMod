@@ -79,6 +79,67 @@ function Require-JsonSection {
     return $Object.PSObject.Properties[$Name].Value
 }
 
+function Get-WebExceptionBody {
+    param([object]$Exception)
+
+    try {
+        if ($null -eq $Exception -or $null -eq $Exception.Response) {
+            return ""
+        }
+
+        $stream = $Exception.Response.GetResponseStream()
+
+        if ($null -eq $stream) {
+            return ""
+        }
+
+        $reader = New-Object System.IO.StreamReader($stream)
+
+        try {
+            return $reader.ReadToEnd()
+        }
+        finally {
+            $reader.Dispose()
+        }
+    }
+    catch {
+        return ""
+    }
+}
+
+function Get-WebExceptionStatus {
+    param([object]$Exception)
+
+    try {
+        if ($null -eq $Exception -or $null -eq $Exception.Response) {
+            return ""
+        }
+
+        $statusCode = ""
+        $statusDescription = ""
+
+        try {
+            $statusCode = [int]$Exception.Response.StatusCode
+            $statusDescription = [string]$Exception.Response.StatusDescription
+        }
+        catch {
+        }
+
+        if ([string]::IsNullOrWhiteSpace($statusCode)) {
+            return ""
+        }
+
+        if ([string]::IsNullOrWhiteSpace($statusDescription)) {
+            return "HTTP $statusCode"
+        }
+
+        return "HTTP $statusCode $statusDescription"
+    }
+    catch {
+        return ""
+    }
+}
+
 function Format-FilterNumber {
     param([double]$Value)
 
@@ -746,15 +807,42 @@ $body = @{
 
 $encodedVoiceId = [System.Uri]::EscapeDataString($VoiceId)
 $uri = "https://api.elevenlabs.io/v1/text-to-speech/$encodedVoiceId/with-timestamps?output_format=$OutputFormat"
+$bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($body)
 
 Write-Host "Generating ElevenLabs voice: $OutName"
 
-$response = Invoke-RestMethod `
-    -Method Post `
-    -Uri $uri `
-    -Headers @{ "xi-api-key" = $resolvedApiKey } `
-    -ContentType "application/json" `
-    -Body $body
+try {
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+
+    $response = Invoke-RestMethod `
+        -Method Post `
+        -Uri $uri `
+        -Headers @{ "xi-api-key" = $resolvedApiKey } `
+        -ContentType "application/json; charset=utf-8" `
+        -Body $bodyBytes `
+        -TimeoutSec 120
+}
+catch {
+    $status = Get-WebExceptionStatus $_.Exception
+    $responseBody = Get-WebExceptionBody $_.Exception
+
+    if ([string]::IsNullOrWhiteSpace($status)) {
+        $status = $_.Exception.Message
+    }
+
+    $message = "ElevenLabs request failed: $status"
+    $message += "`nVoiceId: $VoiceId"
+    $message += "`nModelId: $ModelId"
+    $message += "`nLanguageCode: $LanguageCode"
+    $message += "`nOutputFormat: $OutputFormat"
+    $message += "`nTextLength: $($chunkedText.requestText.Length)"
+
+    if (-not [string]::IsNullOrWhiteSpace($responseBody)) {
+        $message += "`nResponse: $responseBody"
+    }
+
+    throw $message
+}
 
 if ([string]::IsNullOrWhiteSpace($response.audio_base64)) {
     throw "ElevenLabs response does not contain audio_base64."
