@@ -1,5 +1,6 @@
 using GTA;
 using GTAVTrueCrimesMod.Models;
+using GTAVTrueCrimesMod.Systems;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -293,6 +294,28 @@ namespace GTAVTrueCrimesMod
                 effect.subtitles = ReadSubtitleCuesFile(missionFolder, subtitlesFile);
 
             effect.audioSegments = ReadAudioSegments(effectJson, missionFolder);
+            MissionAudioSegment[] folderAudioSegments = MissionAudioFolderLoader.LoadConversationSegments(
+                missionFolder,
+                effect.GetString("conversationFolder", ""),
+                effect.GetString("conversationFirstSpeaker", "shouter"),
+                effect.GetInt("conversationGapAfterMs", 0)
+            );
+
+            if (folderAudioSegments.Length > 0)
+                effect.audioSegments = folderAudioSegments;
+
+            effect.ambientAudioSegments = ReadAudioSegments(effectJson, missionFolder, "ambientAudioSegments");
+            MissionAudioSegment[] ambientFolderAudioSegments = MissionAudioFolderLoader.LoadConversationSegments(
+                missionFolder,
+                effect.GetString("ambientConversationFolder", ""),
+                effect.GetString("ambientConversationFirstSpeaker", effect.GetString("conversationFirstSpeaker", "shouter")),
+                effect.GetInt("ambientConversationGapAfterMs", effect.GetInt("conversationGapAfterMs", 0))
+            );
+
+            if (ambientFolderAudioSegments.Length > 0)
+                effect.ambientAudioSegments = ambientFolderAudioSegments;
+
+            effect.onPlayerSpottedAudioSegments = ReadAudioSegments(effectJson, missionFolder, "onPlayerSpottedAudioSegments");
             effect.onKilledByPlayer = ReadMissionEffects(effectJson, "onKilledByPlayer", missionFolder);
             effect.onKilledByOther = ReadMissionEffects(effectJson, "onKilledByOther", missionFolder);
 
@@ -322,6 +345,7 @@ namespace GTAVTrueCrimesMod
                     MissionAudioSegment segment = new MissionAudioSegment();
 
                     segment.audio = ReadJsonString(segmentJson, "audio");
+                    segment.speaker = ReadJsonString(segmentJson, "speaker");
                     segment.text = ReadJsonString(segmentJson, "text");
                     segment.subtitlesFile = ReadJsonString(segmentJson, "subtitlesFile");
                     segment.subtitles = ReadSubtitleCues(segmentJson, "subtitles");

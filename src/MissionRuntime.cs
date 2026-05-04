@@ -45,6 +45,7 @@ namespace GTAVTrueCrimesMod
         private int interactionPickupCompleteAt;
         private int interactionCompleteAt;
         private string currentInteractionPrompt = "";
+        private string backgroundInteractionPrompt = "";
         private string currentNodeInstructionText = "";
 
         private bool missionFailed = false;
@@ -58,6 +59,7 @@ namespace GTAVTrueCrimesMod
             effectHandlers.Add(new PhoneCallEffectHandler());
             effectHandlers.Add(new SpawnStalkerEffectHandler());
             effectHandlers.Add(new ScriptedStalkerShotEffectHandler());
+            effectHandlers.Add(new SpawnPoliceAmbushEffectHandler());
         }
 
         public DetectiveMission ActiveMission
@@ -92,7 +94,13 @@ namespace GTAVTrueCrimesMod
 
         public string CurrentInteractionPrompt
         {
-            get { return currentInteractionPrompt; }
+            get
+            {
+                if (!string.IsNullOrEmpty(currentInteractionPrompt))
+                    return currentInteractionPrompt;
+
+                return backgroundInteractionPrompt;
+            }
         }
 
         public string CurrentNodeInstructionText
@@ -243,13 +251,13 @@ namespace GTAVTrueCrimesMod
 
         public bool TryInteractWithCurrentNode()
         {
-            if (currentNode == null || missionFailed)
+            if (missionFailed)
                 return false;
 
-            if (currentNode.completeWhen != "interactWithPreservedBody")
-                return false;
+            if (currentNode != null && currentNode.completeWhen == "interactWithPreservedBody")
+                return TryInteractWithPreservedBody();
 
-            return TryInteractWithPreservedBody();
+            return TryInteractWithBackgroundBehavior();
         }
 
         private void TickNodeInstructionClear()
@@ -274,8 +282,15 @@ namespace GTAVTrueCrimesMod
             if (missionFailed)
                 return;
 
+            backgroundInteractionPrompt = "";
+
             for (int i = 0; i < backgroundBehaviors.Count; i++)
                 backgroundBehaviors[i].Behavior.Tick(this);
+        }
+
+        internal void SetBackgroundInteractionPrompt(string prompt)
+        {
+            backgroundInteractionPrompt = string.IsNullOrEmpty(prompt) ? "" : prompt;
         }
 
         public void CompleteCurrentNode()
@@ -302,6 +317,37 @@ namespace GTAVTrueCrimesMod
             GTA.UI.Screen.ShowSubtitle("Koniec sciezki", 5000);
             currentNode = null;
             currentNodeId = "";
+        }
+
+        public void DebugCompleteCurrentNodeAndTeleportToNextTarget(float distanceFromTarget)
+        {
+            if (currentNode == null)
+            {
+                GTA.UI.Screen.ShowSubtitle("Brak aktywnego node'a.", 4000);
+                return;
+            }
+
+            string nextNodeId = currentNode.next;
+
+            if (string.IsNullOrEmpty(nextNodeId))
+            {
+                CompleteCurrentNode();
+                return;
+            }
+
+            MissionNode nextNode = FindNode(nextNodeId);
+
+            if (nextNode != null && nextNode.target != null)
+            {
+                TeleportPlayerNearTarget(ToVector3(nextNode.target), distanceFromTarget);
+                GTA.UI.Screen.ShowSubtitle("Debug: teleport do node'a " + nextNodeId, 2500);
+            }
+            else
+            {
+                GTA.UI.Screen.ShowSubtitle("Debug: przejscie do node'a " + nextNodeId, 2500);
+            }
+
+            CompleteCurrentNode();
         }
 
         public void RetryMission()
@@ -795,6 +841,27 @@ namespace GTAVTrueCrimesMod
             delayedSideMissionCalls.Add(delayedCall);
         }
 
+        internal void PlayMissionAudioCue(string file)
+        {
+            if (string.IsNullOrEmpty(file))
+                return;
+
+            PlayMissionAudio(file);
+        }
+
+        internal void StopMissionAudioCue()
+        {
+            StopMissionAudio();
+        }
+
+        internal void ShowMissionSubtitle(string text, int durationMs)
+        {
+            if (string.IsNullOrEmpty(text))
+                return;
+
+            GTA.UI.Screen.ShowSubtitle(text, Math.Max(1000, durationMs));
+        }
+
         internal void SetFact(string fact, bool value)
         {
             if (string.IsNullOrEmpty(fact))
@@ -846,6 +913,7 @@ namespace GTAVTrueCrimesMod
             interactionPickupCompleteAt = 0;
             interactionCompleteAt = 0;
             currentInteractionPrompt = "";
+            backgroundInteractionPrompt = "";
             currentNodeInstructionText = "";
         }
 
@@ -1134,6 +1202,20 @@ namespace GTAVTrueCrimesMod
             backgroundBehaviors.Clear();
         }
 
+        private bool TryInteractWithBackgroundBehavior()
+        {
+            for (int i = 0; i < backgroundBehaviors.Count; i++)
+            {
+                IInteractiveBackgroundBehavior interactive =
+                    backgroundBehaviors[i].Behavior as IInteractiveBackgroundBehavior;
+
+                if (interactive != null && interactive.TryInteract(this))
+                    return true;
+            }
+
+            return false;
+        }
+
         private void ClearBackgroundBehaviorsForNode(string nodeId)
         {
             if (string.IsNullOrEmpty(nodeId))
@@ -1225,6 +1307,51 @@ namespace GTAVTrueCrimesMod
                 currentNodeBlip.Delete();
                 currentNodeBlip = null;
             }
+        }
+
+        private void TeleportPlayerNearTarget(Vector3 target, float distanceFromTarget)
+        {
+            try
+            {
+                Ped player = Game.Player.Character;
+                Entity teleportEntity = player;
+
+                if (player.IsInVehicle() &&
+                    player.CurrentVehicle != null &&
+                    player.CurrentVehicle.Exists())
+                {
+                    teleportEntity = player.CurrentVehicle;
+                }
+
+                Vector3 direction = player.ForwardVector;
+                direction = new Vector3(direction.X, direction.Y, 0f);
+
+                if (direction.Length() <= 0.01f)
+                    direction = new Vector3(1f, 0f, 0f);
+
+                direction.Normalize();
+
+                float offset = Math.Max(0.5f, distanceFromTarget);
+                Vector3 position = target - direction * offset;
+                position.Z = target.Z + 1.0f;
+
+                teleportEntity.Position = position;
+                teleportEntity.Heading = GetHeadingToward(position, target);
+            }
+            catch
+            {
+            }
+        }
+
+        private float GetHeadingToward(Vector3 from, Vector3 to)
+        {
+            Vector3 direction = to - from;
+            float angle = (float)(Math.Atan2(direction.X, direction.Y) * 180.0 / Math.PI);
+
+            if (angle < 0f)
+                angle += 360f;
+
+            return angle;
         }
 
         private Vector3 ToVector3(JsonVector3 pos)

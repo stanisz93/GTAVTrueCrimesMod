@@ -1,0 +1,35 @@
+﻿{
+    "audio":  "officer_comment_police_station.wav",
+    "sourceText":  "inline",
+    "chunkDelimiter":  "|",
+    "subtitleOffsetMs":  300,
+    "postprocessing":  {
+                           "enabled":  false,
+                           "onlyPostprocessing":  false,
+                           "outputSuffix":  "_phone",
+                           "telephone":  true,
+                           "noise":  0,
+                           "noiseProfile":  "phone",
+                           "hum":  0.0015,
+                           "pan":  -0.25,
+                           "volume":  1.08
+                       },
+    "generatedAtUtc":  "2026-05-03T13:13:53.5337364Z",
+    "subtitles":  [
+                      {
+                          "atMs":  300,
+                          "endMs":  648,
+                          "text":  "OH!"
+                      },
+                      {
+                          "atMs":  672,
+                          "endMs":  1240,
+                          "text":  "THAT\u0027S HIM!"
+                      },
+                      {
+                          "atMs":  1403,
+                          "endMs":  2100,
+                          "text":  "SHOOT HIM!"
+                      }
+                  ]
+}

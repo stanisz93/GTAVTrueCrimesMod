@@ -7,7 +7,8 @@ $knownEffectTypes = @(
     "spawn_stalker",
     "phone_call",
     "set_fact",
-    "scripted_stalker_shot"
+    "scripted_stalker_shot",
+    "spawn_police_ambush"
 )
 $knownNodeTypes = @(
     "objective",
@@ -191,6 +192,154 @@ function Test-ScriptedStalkerShotSettings {
     Test-NonNegativeNumber $FileName $Scope $Settings "shotGapMs"
 }
 
+function Test-ConversationSpeaker {
+    param(
+        [string]$FileName,
+        [string]$Scope,
+        [string]$Speaker
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Speaker)) {
+        return
+    }
+
+    $validSpeakers = @("shouter", "shooter", "officer1", "officer2", "first", "second")
+
+    if ($validSpeakers -notcontains $Speaker) {
+        Add-Error $FileName "$Scope speaker '$Speaker' should be shouter/shooter"
+    }
+}
+
+function Join-NormalizedPath {
+    param(
+        [string]$Root,
+        [string]$RelativePath
+    )
+
+    return Join-Path $Root ($RelativePath -replace "[/\\]", [System.IO.Path]::DirectorySeparatorChar)
+}
+
+function Test-ConversationFolder {
+    param(
+        [string]$FileName,
+        [string]$Scope,
+        [string]$FolderName,
+        [string]$BaseDir,
+        [bool]$RequireSubtitles
+    )
+
+    if ([string]::IsNullOrWhiteSpace($FolderName)) {
+        return
+    }
+
+    $audioDir = Join-NormalizedPath (Join-Path $repoRoot "audio") $FolderName
+
+    if (-not (Test-Path -LiteralPath $audioDir -PathType Container)) {
+        Add-Error $FileName "$Scope conversation folder '$FolderName' missing audio folder '$audioDir'"
+        return
+    }
+
+    $wavFiles = @(Get-ChildItem -LiteralPath $audioDir -Filter "*.wav" -File)
+
+    if ($wavFiles.Count -eq 0) {
+        Add-Error $FileName "$Scope conversation folder '$FolderName' has no .wav files"
+        return
+    }
+
+    if (-not $RequireSubtitles) {
+        return
+    }
+
+    $subtitleDir = Join-NormalizedPath (Join-Path $BaseDir "subtitles") $FolderName
+
+    if (-not (Test-Path -LiteralPath $subtitleDir -PathType Container)) {
+        Add-Error $FileName "$Scope conversation folder '$FolderName' missing matching subtitles folder '$subtitleDir'"
+        return
+    }
+
+    foreach ($wav in $wavFiles) {
+        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($wav.Name)
+        $subtitleJson = Join-Path $subtitleDir ($baseName + ".subtitles.json")
+        $plainJson = Join-Path $subtitleDir ($baseName + ".json")
+
+        if ((Test-Path -LiteralPath $subtitleJson -PathType Leaf) -or
+            (Test-Path -LiteralPath $plainJson -PathType Leaf)) {
+            continue
+        }
+
+        Add-Error $FileName "$Scope conversation folder '$FolderName' missing subtitles for '$($wav.Name)'"
+    }
+}
+
+function Test-PoliceAmbushSettings {
+    param(
+        [string]$FileName,
+        [string]$Scope,
+        [object]$Settings,
+        [string]$BaseDir
+    )
+
+    $requiredPositionFields = @(
+        "spawnPolicemansX",
+        "spawnPolicemansY",
+        "spawnPolicemansZ"
+    )
+
+    foreach ($field in $requiredPositionFields) {
+        if (-not (Has-Property $Settings $field)) {
+            Add-Error $FileName "$Scope spawn_police_ambush missing $field"
+        }
+    }
+
+    Test-PositiveNumber $FileName $Scope $Settings "spawnPolicemansRadius"
+    Test-PositiveNumber $FileName $Scope $Settings "sightDistance"
+    Test-PositiveNumber $FileName $Scope $Settings "sightAngle"
+    Test-PositiveNumber $FileName $Scope $Settings "health"
+    Test-NonNegativeNumber $FileName $Scope $Settings "accuracy"
+    Test-NonNegativeNumber $FileName $Scope $Settings "shootRate"
+    Test-NonNegativeNumber $FileName $Scope $Settings "armor"
+    Test-NonNegativeNumber $FileName $Scope $Settings "dialogueDelayMs"
+    Test-NonNegativeNumber $FileName $Scope $Settings "loopDialogueDelayMs"
+    Test-NonNegativeNumber $FileName $Scope $Settings "spotTimeMs"
+    Test-NonNegativeNumber $FileName $Scope $Settings "loseSightResetMs"
+    Test-NonNegativeNumber $FileName $Scope $Settings "conversationGapAfterMs"
+    Test-NonNegativeNumber $FileName $Scope $Settings "ambientConversationGapAfterMs"
+    Test-NonNegativeNumber $FileName $Scope $Settings "ambientConversationDelayMs"
+    Test-NonNegativeNumber $FileName $Scope $Settings "ambientConversationLoopDelayMs"
+
+    if ((Has-Property $Settings "conversationFolder") -and [string]::IsNullOrWhiteSpace($Settings.conversationFolder)) {
+        Add-Error $FileName "$Scope conversationFolder cannot be empty"
+    }
+
+    if ((Has-Property $Settings "ambientConversationFolder") -and [string]::IsNullOrWhiteSpace($Settings.ambientConversationFolder)) {
+        Add-Error $FileName "$Scope ambientConversationFolder cannot be empty"
+    }
+
+    if (Has-Property $Settings "conversationSubtitlesFolder") {
+        Add-Error $FileName "$Scope do not use conversationSubtitlesFolder; subtitles folder must match conversationFolder"
+    }
+
+    if (Has-Property $Settings "ambientConversationSubtitlesFolder") {
+        Add-Error $FileName "$Scope do not use ambientConversationSubtitlesFolder; subtitles folder must match ambientConversationFolder"
+    }
+
+    if (Has-Property $Settings "conversationFolder") {
+        Test-ConversationFolder $FileName $Scope $Settings.conversationFolder $BaseDir $true
+    }
+
+    if (Has-Property $Settings "ambientConversationFolder") {
+        Test-ConversationFolder $FileName $Scope $Settings.ambientConversationFolder $BaseDir $false
+    }
+
+    if (Has-Property $Settings "conversationFirstSpeaker") {
+        Test-ConversationSpeaker $FileName $Scope $Settings.conversationFirstSpeaker
+    }
+
+    if (Has-Property $Settings "ambientConversationFirstSpeaker") {
+        Test-ConversationSpeaker $FileName $Scope $Settings.ambientConversationFirstSpeaker
+    }
+}
+
 function Test-PhoneCallFields {
     param(
         [string]$FileName,
@@ -343,6 +492,46 @@ function Test-EffectObject {
     }
     elseif ($Effect.type -eq "scripted_stalker_shot") {
         Test-ScriptedStalkerShotSettings $FileName $Scope $Effect
+    }
+    elseif ($Effect.type -eq "spawn_police_ambush") {
+        Test-PoliceAmbushSettings $FileName $Scope $Effect $BaseDir
+
+        if ((Has-Property $Effect "audioSegments") -and $null -ne $Effect.audioSegments) {
+            $index = 0
+
+            foreach ($segment in @($Effect.audioSegments)) {
+                Test-AudioSegment $FileName "$Scope audioSegments[$index]" $segment $BaseDir
+
+                if (Has-Property $segment "speaker") {
+                    Test-ConversationSpeaker $FileName "$Scope audioSegments[$index]" $segment.speaker
+                }
+
+                $index++
+            }
+        }
+
+        if ((Has-Property $Effect "ambientAudioSegments") -and $null -ne $Effect.ambientAudioSegments) {
+            $index = 0
+
+            foreach ($segment in @($Effect.ambientAudioSegments)) {
+                Test-AudioSegment $FileName "$Scope ambientAudioSegments[$index]" $segment $BaseDir
+
+                if (Has-Property $segment "speaker") {
+                    Test-ConversationSpeaker $FileName "$Scope ambientAudioSegments[$index]" $segment.speaker
+                }
+
+                $index++
+            }
+        }
+
+        if ((Has-Property $Effect "onPlayerSpottedAudioSegments") -and $null -ne $Effect.onPlayerSpottedAudioSegments) {
+            $index = 0
+
+            foreach ($segment in @($Effect.onPlayerSpottedAudioSegments)) {
+                Test-AudioSegment $FileName "$Scope onPlayerSpottedAudioSegments[$index]" $segment $BaseDir
+                $index++
+            }
+        }
     }
 
     $hookNames = @("onKilledByPlayer", "onKilledByOther")

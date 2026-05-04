@@ -195,7 +195,11 @@ namespace GTAVTrueCrimesMod.Systems
             fallbackTextAt = HasSubtitleCues(segment) ? 0 : segmentStartAt + 1000;
 
             if (!string.IsNullOrEmpty(segment.audio))
-                events.Add(new PhoneCallEvent(PhoneCallEvent.PlayAudio) { audio = segment.audio });
+                events.Add(new PhoneCallEvent(PhoneCallEvent.PlayAudio)
+                {
+                    audio = segment.audio,
+                    speaker = segment.speaker
+                });
         }
 
         private void AddSubtitleCueEvents(List<PhoneCallEvent> events, MissionAudioSegment segment, int nowMs)

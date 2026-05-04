@@ -11,6 +11,8 @@ namespace GTAVTrueCrimesMod.Models
         public Dictionary<string, string> args = new Dictionary<string, string>();
         public MissionSubtitleCue[] subtitles;
         public MissionAudioSegment[] audioSegments;
+        public MissionAudioSegment[] ambientAudioSegments;
+        public MissionAudioSegment[] onPlayerSpottedAudioSegments;
         public MissionEffect[] onKilledByPlayer;
         public MissionEffect[] onKilledByOther;
 

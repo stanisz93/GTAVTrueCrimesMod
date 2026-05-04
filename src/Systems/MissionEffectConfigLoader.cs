@@ -124,6 +124,28 @@ namespace GTAVTrueCrimesMod.Systems
             effect.id = GetArg(effect.args, "id", "");
             effect.subtitles = ReadSubtitleCues(json, "subtitles");
             effect.audioSegments = ReadAudioSegments(json);
+            MissionAudioSegment[] folderAudioSegments = MissionAudioFolderLoader.LoadConversationSegments(
+                missionsFolder,
+                effect.GetString("conversationFolder", ""),
+                effect.GetString("conversationFirstSpeaker", "shouter"),
+                effect.GetInt("conversationGapAfterMs", 0)
+            );
+
+            if (folderAudioSegments.Length > 0)
+                effect.audioSegments = folderAudioSegments;
+
+            effect.ambientAudioSegments = ReadAudioSegments(json, "ambientAudioSegments");
+            MissionAudioSegment[] ambientFolderAudioSegments = MissionAudioFolderLoader.LoadConversationSegments(
+                missionsFolder,
+                effect.GetString("ambientConversationFolder", ""),
+                effect.GetString("ambientConversationFirstSpeaker", effect.GetString("conversationFirstSpeaker", "shouter")),
+                effect.GetInt("ambientConversationGapAfterMs", effect.GetInt("conversationGapAfterMs", 0))
+            );
+
+            if (ambientFolderAudioSegments.Length > 0)
+                effect.ambientAudioSegments = ambientFolderAudioSegments;
+
+            effect.onPlayerSpottedAudioSegments = ReadAudioSegments(json, "onPlayerSpottedAudioSegments");
 
             string subtitlesFile = effect.GetString("subtitlesFile", "");
 
@@ -176,6 +198,12 @@ namespace GTAVTrueCrimesMod.Systems
             if (source.audioSegments != null && source.audioSegments.Length > 0)
                 target.audioSegments = source.audioSegments;
 
+            if (source.ambientAudioSegments != null && source.ambientAudioSegments.Length > 0)
+                target.ambientAudioSegments = source.ambientAudioSegments;
+
+            if (source.onPlayerSpottedAudioSegments != null && source.onPlayerSpottedAudioSegments.Length > 0)
+                target.onPlayerSpottedAudioSegments = source.onPlayerSpottedAudioSegments;
+
             if (source.onKilledByPlayer != null && source.onKilledByPlayer.Length > 0)
                 target.onKilledByPlayer = source.onKilledByPlayer;
 
@@ -219,9 +247,14 @@ namespace GTAVTrueCrimesMod.Systems
 
         private MissionAudioSegment[] ReadAudioSegments(string json)
         {
+            return ReadAudioSegments(json, "audioSegments");
+        }
+
+        private MissionAudioSegment[] ReadAudioSegments(string json, string key)
+        {
             try
             {
-                string segmentsJson = ReadJsonArray(json, "audioSegments");
+                string segmentsJson = ReadJsonArray(json, key);
 
                 if (string.IsNullOrEmpty(segmentsJson))
                     return new MissionAudioSegment[0];
@@ -235,6 +268,7 @@ namespace GTAVTrueCrimesMod.Systems
                     MissionAudioSegment segment = new MissionAudioSegment();
 
                     segment.audio = ReadJsonString(segmentJson, "audio");
+                    segment.speaker = ReadJsonString(segmentJson, "speaker");
                     segment.text = ReadJsonString(segmentJson, "text");
                     segment.subtitlesFile = ReadJsonString(segmentJson, "subtitlesFile");
                     segment.subtitles = ReadSubtitleCues(segmentJson, "subtitles");

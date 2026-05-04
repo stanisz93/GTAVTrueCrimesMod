@@ -16,6 +16,7 @@ namespace GTAVTrueCrimesMod.Systems
         public string type;
         public string text;
         public string audio;
+        public string speaker;
         public int durationMs;
 
         public PhoneCallEvent(string type)

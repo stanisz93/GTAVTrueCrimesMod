@@ -109,7 +109,11 @@ namespace GTAVTrueCrimesMod.Systems
             fallbackTextAt = HasSubtitleCues(segment) ? 0 : segmentStartAt + 300;
 
             if (segment != null && !string.IsNullOrEmpty(segment.audio))
-                events.Add(new PhoneCallEvent(PhoneCallEvent.PlayAudio) { audio = segment.audio });
+                events.Add(new PhoneCallEvent(PhoneCallEvent.PlayAudio)
+                {
+                    audio = segment.audio,
+                    speaker = segment.speaker
+                });
         }
 
         private void AddSubtitleCueEvents(List<PhoneCallEvent> events, MissionAudioSegment segment, int nowMs)
@@ -166,10 +170,18 @@ namespace GTAVTrueCrimesMod.Systems
                 return 8000;
 
             if (segment.completeAfterMs > 0)
-                return segment.completeAfterMs;
+                return Math.Max(segment.completeAfterMs, GetSubtitleDurationMs(segment));
 
             if (!HasSubtitleCues(segment))
                 return 8000;
+
+            return Math.Max(GetSubtitleDurationMs(segment), 1000);
+        }
+
+        private int GetSubtitleDurationMs(MissionAudioSegment segment)
+        {
+            if (!HasSubtitleCues(segment))
+                return 0;
 
             int lastEnd = 0;
 
@@ -181,7 +193,7 @@ namespace GTAVTrueCrimesMod.Systems
                     lastEnd = cueEnd;
             }
 
-            return Math.Max(lastEnd, 1000);
+            return lastEnd;
         }
     }
 }

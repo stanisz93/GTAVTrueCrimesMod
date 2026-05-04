@@ -1,6 +1,7 @@
 {
   "voiceConfig": {
-    "outName": "morgan_warning",
+    "outName": "warning",
+    "characterPrefix": "morgan",
     "text": "Cześć. Tu Morgan. | Posłuchaj mnie. | Nie idź alejką. Nie dziś wieczorem. | Ktoś cię śledzi. | W chwili, gdy opuścisz tłum, ułatwisz mu to. | Więc proszę, trzymaj się blisko ludzi. | W tej chwili świadkowie to twoja jedyna broń.",
     "chunkDelimiter": "|",
     "subtitleOffsetMs": 0,

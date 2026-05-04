@@ -27,7 +27,8 @@ Example:
 ```json
 {
   "voiceConfig": {
-    "outName": "morgan_warning",
+    "outName": "warning",
+    "characterPrefix": "morgan",
     "text": "Cześć. Tu Morgan. | Posłuchaj mnie. | Nie idź alejką. Nie dziś wieczorem.",
     "chunkDelimiter": "|",
     "subtitleOffsetMs": 0,
@@ -66,6 +67,8 @@ Example:
 
 Use `|` in `voiceConfig.text` to mark subtitle chunks. The script removes `|` before sending text to ElevenLabs, then maps ElevenLabs character timing back to one subtitle cue per chunk. If subtitles feel early in-game, set `voiceConfig.subtitleOffsetMs` to a positive value such as `250` or `400`.
 
+`voiceConfig.characterPrefix` is prepended to `outName` when needed. For example, `"characterPrefix": "morgan"` and `"outName": "warning"` produce `morgan_warning.wav` and `morgan_warning.subtitles.json`. If `outName` already starts with `morgan_`, the prefix is not duplicated.
+
 ## Generate audio and subtitles
 
 ```powershell
@@ -98,6 +101,8 @@ audio/morgan_warning.wav              # only when ffmpeg is installed and -Conve
 missions/subtitles/morgan_warning.subtitles.json
 missions/subtitles/morgan_warning.node-snippet.json
 ```
+
+When WAV conversion succeeds, the intermediate MP3 generated in that run is deleted automatically.
 
 Current runtime audio playback uses `System.Media.SoundPlayer`, so mission audio should be WAV in-game. ElevenLabs Creator supports high bitrate MP3; WAV/PCM 44.1 kHz requires a higher ElevenLabs tier, so local ffmpeg conversion is the practical path.
 
@@ -170,3 +175,52 @@ audio files, use `audioSegments`:
 
 The runtime starts the phone hold animation once, plays each segment in order,
 then hangs up after the final segment.
+
+For two-person overheard conversations, use a folder and numbered output names:
+
+```json
+{
+  "type": "spawn_police_ambush",
+  "conversationFolder": "police_station_ambush",
+  "conversationFirstSpeaker": "shouter",
+  "conversationGapAfterMs": 400
+}
+```
+
+The loader reads `audio/police_station_ambush/*.wav` by the first number in the
+file name, alternates speakers between `shouter` and `shooter`, and looks for
+matching subtitle files under `missions/subtitles/police_station_ambush/`. Use
+names like `01_intro.wav`, `02_reply.wav`, and matching
+`01_intro.subtitles.json`.
+
+## Split Studio VTT subtitles
+
+If ElevenLabs Studio exports one `.vtt` file for a conversation that is split
+into multiple WAV files, put that `.vtt` in the same folder as the WAV files and
+convert it into one runtime subtitle JSON per WAV:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\convert-vtt-subtitles.ps1 `
+  -AudioFolder ".\audio\police_station_ambush" `
+  -OutputFolder ".\missions\subtitles\police_station_ambush"
+```
+
+The splitter expects multiple WAV files and exactly one VTT file in the audio
+folder. If there are zero or several VTT files, it stops with an error so the
+wrong captions do not get matched silently.
+
+The splitter orders WAV files by the first number in the file name. In `Auto`
+mode, if the number of VTT cues matches the number of WAV files, it maps cues
+to WAVs one by one in that order. This is the preferred mode for Studio exports
+where each WAV is one spoken line. If the counts differ, it falls back to
+duration-based splitting and assigns each VTT cue to the audio file whose time
+range contains the cue midpoint. It writes files like:
+
+```text
+missions/subtitles/police_station_ambush/01_intro.subtitles.json
+missions/subtitles/police_station_ambush/02_reply.subtitles.json
+```
+
+Keep the first number in each WAV name aligned with the Studio conversation
+order, for example `officer_01_intro.wav`, `officer_02_reply.wav`,
+`officer_10_later.wav`.

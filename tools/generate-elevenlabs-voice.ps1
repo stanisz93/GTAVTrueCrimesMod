@@ -12,6 +12,7 @@ param(
     [string]$SubtitleDir = ".\missions\subtitles",
     [string]$FfmpegPath = "",
     [string]$ChunkDelimiter = "|",
+    [string]$CharacterPrefix = "",
     [int]$SubtitleOffsetMs = 0,
     [double]$Speed = 0.73,
     [double]$Stability = 0.70,
@@ -77,6 +78,51 @@ function Require-JsonSection {
     }
 
     return $Object.PSObject.Properties[$Name].Value
+}
+
+function Resolve-OutNameWithCharacterPrefix {
+    param(
+        [string]$Name,
+        [string]$Prefix
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Name) -or [string]::IsNullOrWhiteSpace($Prefix)) {
+        return $Name
+    }
+
+    $cleanPrefix = ($Prefix.Trim() -replace '[^A-Za-z0-9_-]+', '_').Trim("_- ".ToCharArray())
+
+    if ([string]::IsNullOrWhiteSpace($cleanPrefix)) {
+        return $Name
+    }
+
+    $prefixToken = "$cleanPrefix`_"
+    $directory = [System.IO.Path]::GetDirectoryName($Name)
+    $fileName = [System.IO.Path]::GetFileName($Name)
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($fileName)
+    $extension = [System.IO.Path]::GetExtension($fileName)
+
+    if ($baseName.StartsWith($prefixToken, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $Name
+    }
+
+    $prefixedName = "$prefixToken$baseName$extension"
+
+    if ([string]::IsNullOrWhiteSpace($directory)) {
+        return $prefixedName
+    }
+
+    return Join-Path $directory $prefixedName
+}
+
+function Ensure-ParentDirectory {
+    param([string]$Path)
+
+    $parent = Split-Path -Parent $Path
+
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    }
 }
 
 function Get-WebExceptionBody {
@@ -639,6 +685,7 @@ if (-not [string]::IsNullOrWhiteSpace($ConfigFile)) {
     $TextFile = Get-JsonValue $voiceConfig "textFile" $TextFile
     $Text = Get-JsonValue $voiceConfig "text" $Text
     $OutName = Get-JsonValue $voiceConfig "outName" $OutName
+    $CharacterPrefix = Get-JsonValue $voiceConfig "characterPrefix" $CharacterPrefix
     $AudioDir = Get-JsonValue $voiceConfig "audioDir" $AudioDir
     $SubtitleDir = Get-JsonValue $voiceConfig "subtitleDir" $SubtitleDir
     $FfmpegPath = Get-JsonValue $voiceConfig "ffmpegPath" $FfmpegPath
@@ -689,6 +736,8 @@ if ([string]::IsNullOrWhiteSpace($OutName)) {
     throw "OutName is required. Set outName in config or pass -OutName."
 }
 
+$OutName = Resolve-OutNameWithCharacterPrefix -Name $OutName -Prefix $CharacterPrefix
+
 New-Item -ItemType Directory -Force -Path $resolvedAudioDir | Out-Null
 New-Item -ItemType Directory -Force -Path $resolvedSubtitleDir | Out-Null
 
@@ -722,6 +771,7 @@ if ($PostprocessingOnly) {
 
     $variantAudioFileName = "$variantBaseName.wav"
     $variantAudioPath = Join-Path $resolvedAudioDir $variantAudioFileName
+    Ensure-ParentDirectory $variantAudioPath
 
     Write-Host "Postprocessing existing audio without ElevenLabs: $sourceAudioPath"
     Invoke-WavConversion `
@@ -758,6 +808,7 @@ if ($PostprocessingOnly) {
     }
 
     $snippetPath = Join-Path $resolvedSubtitleDir "$variantBaseName.node-snippet.json"
+    Ensure-ParentDirectory $snippetPath
     [pscustomobject]$snippet | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $snippetPath -Encoding UTF8
 
     Write-Host "Postprocessed audio: $variantAudioPath"
@@ -851,6 +902,7 @@ if ([string]::IsNullOrWhiteSpace($response.audio_base64)) {
 $audioExtension = Get-AudioExtension $OutputFormat
 $audioFileName = "$OutName.$audioExtension"
 $audioPath = Join-Path $resolvedAudioDir $audioFileName
+Ensure-ParentDirectory $audioPath
 [System.IO.File]::WriteAllBytes($audioPath, [System.Convert]::FromBase64String($response.audio_base64))
 
 $alignment = if ($null -ne $response.alignment) { $response.alignment } else { $response.normalized_alignment }
@@ -865,6 +917,7 @@ else {
 $cues = Apply-SubtitleOffset -Cues @($cues) -OffsetMs $SubtitleOffsetMs
 
 $subtitlePath = Join-Path $resolvedSubtitleDir "$OutName.subtitles.json"
+Ensure-ParentDirectory $subtitlePath
 
 $nodeAudioFileName = $audioFileName
 
@@ -876,6 +929,7 @@ if ($ConvertToWav -and $audioExtension -ne "wav") {
     }
     else {
         $wavPath = Join-Path $resolvedAudioDir "$OutName.wav"
+        Ensure-ParentDirectory $wavPath
         Invoke-WavConversion `
             -FfmpegPath $ffmpegPath `
             -InputPath $audioPath `
@@ -889,12 +943,17 @@ if ($ConvertToWav -and $audioExtension -ne "wav") {
             -PostprocessingHum $PostprocessingHum
 
         $nodeAudioFileName = "$OutName.wav"
+
+        if (Test-Path -LiteralPath $wavPath) {
+            Remove-Item -LiteralPath $audioPath -Force
+        }
     }
 }
 
 $subtitleObject = [pscustomobject]@{
     audio = $nodeAudioFileName
     sourceText = $sourceTextName
+    characterPrefix = $CharacterPrefix
     chunkDelimiter = $ChunkDelimiter
     subtitleOffsetMs = $SubtitleOffsetMs
     postprocessing = [pscustomobject]@{
@@ -921,6 +980,7 @@ $snippet = [pscustomobject]@{
 }
 
 $snippetPath = Join-Path $resolvedSubtitleDir "$OutName.node-snippet.json"
+Ensure-ParentDirectory $snippetPath
 $snippet | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $snippetPath -Encoding UTF8
 
 Write-Host "Audio: $audioPath"

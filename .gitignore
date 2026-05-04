@@ -12,6 +12,7 @@
 !/tools/
 !/tools/**
 /tools/voice_generator_config.json
+/tools/*_voice_generator_config.json
 !/docs/
 /docs/*
 !/docs/voice-generation.md

@@ -86,7 +86,7 @@
           "damage": 500
         }
       ],
-      "setFact": "visited_crime_scene",
+      "setFact": "taked_note_from_scene",
       "next": "inspect_body"
     },
     {
@@ -115,23 +115,92 @@
       "id": "go_to_police_station",
       "type": "objective",
       "text": "Go to the neareast police station mentioned in the note.",
-      "onEnter": [
-        {
-          "type": "phone_call",
-          "caller": "Morgan",
-          "delayMs": 5000,
-          "audio": "margan_comment_police_station.wav",
-          "subtitlesFile": "subtitles/margan_comment_police_station.subtitles.json"
-        }
-      ],
       "target": {
-        "x": 345.49,
-        "y": -1600.23,
+        "x": 330.15,
+        "y": -1591.31,
         "z": 29.29
       },
       "completeWhen": "playerNearTarget",
       "setFact": "white_van_seen_heading_docks",
-      "next": "listen_to_policemans"
+      "next": "police_station_dexter_call"
+    },
+    {
+      "id": "police_station_dexter_call",
+      "type": "objective",
+      "text": "Odbierz telefon Dextera.",
+      "onEnter": [
+        {
+          "type": "phone_call",
+          "caller": "Dexter",
+          "delayMs": 1000,
+          "completeCurrentNode": true,
+          "audio": "margan_comment_police_station.wav",
+          "subtitlesFile": "subtitles/margan_comment_police_station.subtitles.json"
+        }
+      ],
+      "next": "police_station_ambush"
+    },
+    {
+      "id": "police_station_ambush",
+      "type": "objective",
+      "text": "Podsłuchaj policjantów przy posterunku.",
+      "target": {
+        "x": 341.03,
+        "y": -1596.81,
+        "z": 29.29
+      },
+      "onEnter": [
+        {
+          "type": "spawn_police_ambush",
+          "id": "police_station_ambush",
+          "lifetime": "node",
+          "requireListenSpotForDialogue": true,
+          "listenSpotX": 341.03,
+          "listenSpotY": -1596.81,
+          "listenSpotZ": 29.29,
+          "listenSpotRadius": 1.8,
+          "listenRequireCover": true,
+          "listenPrompt": "E - Podsluchuj z oslony",
+          "ambientConversationFolder": "01_policeman_conv_police_station_ambient",
+          "ambientConversationFirstSpeaker": "shouter",
+          "ambientConversationGapAfterMs": 400,
+          "ambientConversationDelayMs": 1000,
+          "ambientConversationLoopDelayMs": 2000,
+          "exitAfterDialogueX": 353.64,
+          "exitAfterDialogueY": -1592.98,
+          "exitAfterDialogueZ": 29.29,
+          "exitAfterDialogueDistance": 2.0,
+          "exitAfterDialogueTimeoutMs": 15000,
+          "spawnPolicemansX": 348.73,
+          "spawnPolicemansY": -1594.90,
+          "spawnPolicemansZ": 29.29,
+          "spawnPolicemansRadius": 1.0,
+          "sightDistance": 35.0,
+          "sightAngle": 70.0,
+          "spotTimeMs": 900,
+          "loseSightResetMs": 1200,
+          "requireLineOfSight": true,
+          "weapon": "SpecialCarbine",
+          "accuracy": 100,
+          "shootRate": 1000,
+          "health": 250,
+          "armor": 100,
+          "failOnPlayerDeath": true,
+          "suppressWantedLevel": true,
+          "useScenarioRelationshipGroup": true,
+          "onPlayerSpottedAudioSegments": [
+            {
+              "audio": "officer_comment_police_station.wav",
+              "subtitlesFile": "subtitles/officer_comment_police_station.subtitles.json"
+            }
+          ],
+          "dialogueDelayMs": 1500,
+          "loopDialogue": false,
+          "conversationFolder": "01_policeman_conv_police_station",
+          "conversationFirstSpeaker": "shouter",
+          "conversationGapAfterMs": 400
+        }
+      ]
     },
     {
       "id": "listen_to_policemans",

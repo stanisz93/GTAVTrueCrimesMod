@@ -62,7 +62,7 @@
       "problemMatcher": []
     },
     {
-      "label": "generate ElevenLabs voice",
+      "label": "generate ElevenLabs Player voice",
       "type": "shell",
       "command": "powershell",
       "args": [
@@ -72,7 +72,54 @@
         "-File",
         ".\\tools\\generate-elevenlabs-voice.ps1",
         "-ConfigFile",
-        ".\\tools\\voice_generator_config.json"
+        ".\\tools\\player_voice_generator_config.json"
+      ],
+      "problemMatcher": []
+    },    
+    {
+      "label": "generate ElevenLabs Morgan voice",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\tools\\generate-elevenlabs-voice.ps1",
+        "-ConfigFile",
+        ".\\tools\\morgan_voice_generator_config.json"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "generate ElevenLabs Policeman voice",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\tools\\generate-elevenlabs-voice.ps1",
+        "-ConfigFile",
+        ".\\tools\\officer_voice_generator_config.json"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "convert VTT Officer conversation subtitles",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\tools\\convert-vtt-subtitles.ps1",
+        "-AudioFolder",
+        ".\\audio\\01_policeman_conv_police_station",
+        "-OutputFolder",
+        ".\\missions\\subtitles\\01_policeman_conv_police_station"
       ],
       "problemMatcher": []
     },

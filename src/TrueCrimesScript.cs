@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using System.Windows.Forms;
 
 namespace GTAVTrueCrimesMod
@@ -110,6 +111,18 @@ namespace GTAVTrueCrimesMod
             if (e.KeyCode == Keys.F11)
             {
                 missionRuntime.ShowDebugState();
+                return;
+            }
+
+            if (e.KeyCode == Keys.F12)
+            {
+                missionRuntime.DebugCompleteCurrentNodeAndTeleportToNextTarget(5.0f);
+                return;
+            }
+
+            if (e.KeyCode == Keys.B)
+            {
+                CaptureListenSpotSnippet();
                 return;
             }
 
@@ -269,6 +282,38 @@ namespace GTAVTrueCrimesMod
                 ", z=" + pos.Z.ToString("0.00", CultureInfo.InvariantCulture);
 
             GTA.UI.Screen.ShowSubtitle(text, 8000);
+        }
+
+        private void CaptureListenSpotSnippet()
+        {
+            try
+            {
+                Ped player = Game.Player.Character;
+                Vector3 pos = player.Position;
+
+                string snippet =
+                    "\"listenSpotX\": " + pos.X.ToString("0.00", CultureInfo.InvariantCulture) + "," + Environment.NewLine +
+                    "\"listenSpotY\": " + pos.Y.ToString("0.00", CultureInfo.InvariantCulture) + "," + Environment.NewLine +
+                    "\"listenSpotZ\": " + pos.Z.ToString("0.00", CultureInfo.InvariantCulture) + "," + Environment.NewLine +
+                    "\"listenSpotRadius\": 1.8," + Environment.NewLine +
+                    "\"listenRequireCover\": true," + Environment.NewLine +
+                    "\"listenPrompt\": \"E - Podsluchuj z oslony\"";
+
+                string path = Path.Combine(missionLoader.MissionsFolder, "debug_listen_spot_snippet.json");
+                File.WriteAllText(path, snippet, Encoding.UTF8);
+
+                string subtitle =
+                    "Listen spot zapisany: x=" + pos.X.ToString("0.00", CultureInfo.InvariantCulture) +
+                    " y=" + pos.Y.ToString("0.00", CultureInfo.InvariantCulture) +
+                    " z=" + pos.Z.ToString("0.00", CultureInfo.InvariantCulture) +
+                    " | missions/debug_listen_spot_snippet.json";
+
+                GTA.UI.Screen.ShowSubtitle(subtitle, 9000);
+            }
+            catch (Exception ex)
+            {
+                GTA.UI.Screen.ShowSubtitle("Blad zapisu listen spot: " + ex.Message, 6000);
+            }
         }
 
         private string SafeText(string value)
